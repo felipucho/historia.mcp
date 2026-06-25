@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__BOT_NAME__</title>
+<style>
+  :root {
+    --bg:        #05060a;
+    --fg:        #e9ecf3;
+    --muted:     #8b93a7;
+    --accent:    #00e5ff;
+    --accent-2:  #a855f7;
+    --bubble-ai: rgba(255, 255, 255, 0.05);
+    --border:    rgba(255, 255, 255, 0.10);
+    --glass:     rgba(13, 16, 26, 0.55);
+    --shadow:    0 8px 40px rgba(0, 0, 0, 0.45);
+    --radius:    22px;
+    --font:      "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+    overflow: hidden;
+  }
+
+  /* ── Fondo animado ───────────────────────────────────────────── */
+  #bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    display: block;
+  }
+
+  .aurora {
+    position: fixed;
+    inset: -20%;
+    z-index: -1;
+    filter: blur(90px);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .aurora span {
+    position: absolute;
+    display: block;
+    width: 46vmax;
+    height: 46vmax;
+    border-radius: 50%;
+    mix-blend-mode: screen;
+  }
+  .aurora .b1 {
+    background: radial-gradient(circle at center, var(--accent), transparent 60%);
+    top: -10%; left: -5%;
+    animation: drift1 22s ease-in-out infinite;
+  }
+  .aurora .b2 {
+    background: radial-gradient(circle at center, var(--accent-2), transparent 60%);
+    bottom: -15%; right: -5%;
+    animation: drift2 26s ease-in-out infinite;
+  }
+  .aurora .b3 {
+    background: radial-gradient(circle at center, #2563eb, transparent 60%);
+    top: 30%; left: 40%;
+    animation: drift3 30s ease-in-out infinite;
+  }
+  @keyframes drift1 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    50%     { transform: translate(12vw, 8vh) scale(1.15); }
+  }
+  @keyframes drift2 {
+    0%,100% { transform: translate(0,0) scale(1.1); }
+    50%     { transform: translate(-10vw, -6vh) scale(0.9); }
+  }
+  @keyframes drift3 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    50%     { transform: translate(-8vw, 10vh) scale(1.2); }
+  }
+
+  /* ── Layout ──────────────────────────────────────────────────── */
+  .app {
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 18px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 6px;
+  }
+  .logo {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 18px rgba(0, 229, 255, 0.55);
+    animation: pulse 3.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 14px rgba(0,229,255,0.45); }
+    50%     { box-shadow: 0 0 26px rgba(168,85,247,0.7); }
+  }
+  header .title {
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  header .badge {
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 4px;
+  }
+
+  main {
+    flex: 1;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    padding: 10px 6px 20px;
+  }
+  main::-webkit-scrollbar { width: 8px; }
+  main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+
+  /* ── Estado vacío ────────────────────────────────────────────── */
+  .empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 22px;
+  }
+  .empty h1 {
+    font-size: clamp(26px, 4vw, 40px);
+    font-weight: 600;
+    margin: 0;
+    background: linear-gradient(90deg, #fff, var(--accent), var(--accent-2), #fff);
+    background-size: 300% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shine 8s linear infinite;
+  }
+  @keyframes shine { to { background-position: 300% center; } }
+  .empty p { color: var(--muted); margin: 0; max-width: 460px; }
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    max-width: 600px;
+  }
+  .chip {
+    background: var(--glass);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: border-color .2s, transform .2s, box-shadow .2s;
+  }
+  .chip:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 0 18px rgba(0,229,255,0.25);
+  }
+
+  /* ── Mensajes ────────────────────────────────────────────────── */
+  .messages { display: flex; flex-direction: column; gap: 18px; }
+  .msg { display: flex; gap: 12px; align-items: flex-start; animation: rise .35s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .msg.user { flex-direction: row-reverse; }
+
+  .avatar {
+    flex: 0 0 32px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 14px;
+  }
+  .msg.ai .avatar   { background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 14px rgba(0,229,255,0.4); }
+  .msg.user .avatar { background: rgba(255,255,255,0.08); border: 1px solid var(--border); }
+
+  .bubble {
+    padding: 13px 16px;
+    border-radius: 16px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-width: 78%;
+    font-size: 15px;
+  }
+  .msg.ai .bubble {
+    background: var(--bubble-ai);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    border-top-left-radius: 4px;
+  }
+  .msg.user .bubble {
+    background: linear-gradient(135deg, rgba(0,229,255,0.16), rgba(168,85,247,0.16));
+    border: 1px solid rgba(0,229,255,0.30);
+    border-top-right-radius: 4px;
+  }
+
+  .bubble.streaming::after {
+    content: "▋";
+    margin-left: 1px;
+    color: var(--accent);
+    animation: caret 1s steps(1) infinite;
+  }
+  @keyframes caret { 50% { opacity: 0; } }
+
+  .typing { display: inline-flex; gap: 5px; padding: 4px 2px; }
+  .typing i {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    animation: blink 1.2s infinite ease-in-out;
+  }
+  .typing i:nth-child(2) { animation-delay: .2s; }
+  .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100% { opacity:.25; transform: scale(.8);} 40% { opacity:1; transform: scale(1);} }
+
+  /* ── Composer ────────────────────────────────────────────────── */
+  footer { padding: 8px 0 18px; }
+  #composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 8px 8px 16px;
+    backdrop-filter: blur(14px);
+    box-shadow: var(--shadow);
+    transition: border-color .2s, box-shadow .2s;
+  }
+  #composer:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 28px rgba(0,229,255,0.25);
+  }
+  #input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 15px;
+    resize: none;
+    outline: none;
+    max-height: 180px;
+    line-height: 1.5;
+    padding: 8px 0;
+  }
+  #input::placeholder { color: var(--muted); }
+  .send {
+    flex: 0 0 38px;
+    width: 38px; height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #04060a;
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: transform .15s, opacity .2s;
+  }
+  .send:hover { transform: scale(1.08); }
+  .send:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .send svg { width: 18px; height: 18px; }
+
+  .disclaimer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin: 10px 0 0;
+  }
+
+  .credits {
+    text-align: center;
+    color: var(--muted);
+    font-size: 10.5px;
+    opacity: 0.55;
+    margin: 4px 0 0;
+    letter-spacing: 0.2px;
+    transition: opacity .25s;
+  }
+  .credits:hover { opacity: 0.9; }
+  .credits .sep { margin: 0 6px; opacity: 0.5; }
+  .credits a {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted transparent;
+    transition: color .2s, border-color .2s;
+  }
+  .credits a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+</style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div class="aurora"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
+
+  <div class="app">
+    <header>
+      <div class="logo"></div>
+      <span class="title">__BOT_NAME__</span>
+      <span class="badge">Historia de Las Varillas</span>
+    </header>
+
+    <main id="chat">
+      <div class="empty" id="empty">
+        <h1>Listo cuando vos quieras.</h1>
+        <p>Preguntame sobre la fundación de Las Varillas y las teorías de 1900, 1903 y 1904.</p>
+        <div class="suggestions">
+          <button class="chip">¿A qué postura suscribe Valter Dabbene?</button>
+          <button class="chip">¿Qué dice el Centro de Estudios Parada KM 81?</button>
+          <button class="chip">Dame un resumen de las tres teorías.</button>
+        </div>
+      </div>
+      <div class="messages" id="messages"></div>
+    </main>
+
+    <footer>
+      <form id="composer">
+        <textarea id="input" rows="1" placeholder="Preguntá sobre la historia de Las Varillas…" autofocus></textarea>
+        <button class="send" id="send" type="submit" title="Enviar" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+        </button>
+      </form>
+      <p class="disclaimer">__BOT_NAME__ puede equivocarse. Verificá la información importante.</p>
+      <p class="credits">Página web programada por: <a href="https://github.com/felipucho/historia.mcp" target="_blank" rel="noopener">Felipe Pautasso</a><span class="sep">·</span>Claude Code</p>
+    </footer>
+  </div>
+
+<script>
+  // ── Fondo: constelación de partículas ──────────────────────────
+  const canvas = document.getElementById("bg");
+  const ctx = canvas.getContext("2d");
+  let particles = [], W, H;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    const count = Math.min(110, Math.floor((W * H) / 16000));
+    particles = Array.from({ length: count }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      r: Math.random() * 1.6 + 0.4,
+    }));
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 229, 255, 0.55)";
+      ctx.fill();
+    }
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const a = particles[i], b = particles[j];
+        const dx = a.x - b.x, dy = a.y - b.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 130) {
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.strokeStyle = "rgba(120, 170, 255," + (0.12 * (1 - dist / 130)) + ")";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  draw();
+
+  // ── Chat ───────────────────────────────────────────────────────
+  const form     = document.getElementById("composer");
+  const input    = document.getElementById("input");
+  const sendBtn  = document.getElementById("send");
+  const messages = document.getElementById("messages");
+  const empty    = document.getElementById("empty");
+  const chat     = document.getElementById("chat");
+
+  // Resolver el endpoint de forma robusta. En una vista previa (file://, srcdoc,
+  // blob:) no hay origin http y el fetch con ruta relativa falla; ahí queda null.
+  const API_URL = (location.protocol === "http:" || location.protocol === "https:")
+    ? new URL("/api/chat", location.href).href
+    : null;
+
+  function autoGrow() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 180) + "px";
+    sendBtn.disabled = input.value.trim() === "";
+  }
+  input.addEventListener("input", autoGrow);
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  function scrollDown() { chat.scrollTop = chat.scrollHeight; }
+
+  function addMessage(role, text) {
+    empty.style.display = "none";
+    const msg = document.createElement("div");
+    msg.className = "msg " + (role === "user" ? "user" : "ai");
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = role === "user" ? "🧑" : "🏛️";
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    messages.appendChild(msg);
+    scrollDown();
+    return bubble;
+  }
+
+  function addTyping() {
+    empty.style.display = "none";
+    const msg = document.createElement("div");
+    msg.className = "msg ai";
+    msg.innerHTML = '<div class="avatar">🏛️</div>' +
+                    '<div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div>';
+    messages.appendChild(msg);
+    scrollDown();
+    return msg;
+  }
+
+  let busy = false;
+  async function send(text) {
+    if (busy || !text.trim()) return;
+
+    if (!API_URL) {
+      addMessage("user", text);
+      input.value = "";
+      autoGrow();
+      addMessage("ai", "⚠️ Esta es una vista previa del diseño, sin servidor. Para chatear de verdad: ejecutá  python web.py  en una terminal y abrí  http://127.0.0.1:8000  en tu navegador.");
+      return;
+    }
+
+    busy = true;
+    sendBtn.disabled = true;
+
+    addMessage("user", text);
+    input.value = "";
+    autoGrow();
+    const typing = addTyping();
+
+    let bubble = null;   // se crea recién al llegar el primer token
+    let acc = "";
+
+    function ensureBubble() {
+      if (!bubble) {
+        typing.remove();
+        bubble = addMessage("ai", "");
+        bubble.classList.add("streaming");
+      }
+      return bubble;
+    }
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop();                 // posible evento incompleto
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data:")) continue;
+          let payload;
+          try { payload = JSON.parse(line.slice(5).trim()); }
+          catch { continue; }
+
+          if (payload.delta) {
+            acc += payload.delta;
+            ensureBubble().textContent = acc;
+            scrollDown();
+          } else if (payload.error) {
+            ensureBubble().textContent = payload.error;
+          }
+        }
+      }
+
+      if (bubble) bubble.classList.remove("streaming");
+      else { typing.remove(); addMessage("ai", "Sin respuesta."); }
+    } catch (err) {
+      if (bubble) bubble.classList.remove("streaming");
+      else typing.remove();
+      addMessage("ai", "💥 No se pudo contactar al servidor: " + err.message);
+    } finally {
+      busy = false;
+      autoGrow();
+      input.focus();
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    send(input.value);
+  });
+
+  document.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => send(chip.textContent));
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "debates_origen_01",
+    "titulo": "Teoría de Fundación 1900 - Llegada del Ferrocarril",
+    "contenido": "La teoría del año 1900 sostiene que el hito fundacional de Las Varillas fue la llegada del ferrocarril a la región el 24 de diciembre de 1900. Esta postura es respaldada por el Centro de Estudios Parada KM 81, que considera este evento como el momento en que se estableció el primer núcleo poblacional organizado alrededor de la estación ferroviaria. El ferrocarril actuó como catalizador del asentamiento definitivo, atrayendo comerciantes y pobladores que formaron el embrión del futuro pueblo.",
+    "tags": ["1900", "ferrocarril", "fundación", "Centro de Estudios Parada KM 81", "estación"],
+    "metadata": {
+      "criterio_historiografico": "Hito infraestructural",
+      "fecha_clave": "24 de diciembre de 1900",
+      "fuente": "Centro de Estudios Parada KM 81"
+    }
+  },
+  {
+    "id": "debates_origen_02",
+    "titulo": "Teoría de Fundación 1903 - Postura de Valter Dabbene",
+    "contenido": "La teoría del año 1903 es defendida por el historiador Valter Dabbene, quien argumenta que la fundación oficial de Las Varillas debe datarse en 1903, cuando se realizaron los primeros actos administrativos y legales que le dieron carácter de localidad reconocida. Dabbene sustenta su postura en documentación municipal y registros oficiales de la época, señalando que sin reconocimiento institucional no puede hablarse de fundación en sentido estricto.",
+    "tags": ["1903", "Dabbene", "Valter Dabbene", "fundación", "administrativa", "legal"],
+    "metadata": {
+      "criterio_historiografico": "Hito administrativo-legal",
+      "fecha_clave": "1903",
+      "fuente": "Valter Dabbene"
+    }
+  },
+  {
+    "id": "debates_origen_03",
+    "titulo": "Teoría de Fundación 1904 - Postura de Alvarez",
+    "contenido": "La teoría del año 1904, vinculada al historiador Alvarez, propone que la verdadera fundación de Las Varillas se produjo en 1904, cuando se efectuó la mensura oficial del ejido urbano y se trazaron definitivamente las calles y manzanas del pueblo. Esta perspectiva prioriza el criterio urbanístico-catastral como acto fundacional, argumentando que solo con el trazado formal del ejido existe un pueblo en términos jurídicos y geográficos.",
+    "tags": ["1904", "Alvarez", "mensura", "fundación", "ejido urbano", "trazado"],
+    "metadata": {
+      "criterio_historiografico": "Hito urbanístico-catastral",
+      "fecha_clave": "1904",
+      "fuente": "Alvarez"
+    }
+  }
+]
