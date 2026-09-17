@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Sin Google Fonts: evita una request a terceros y el @import fuera de orden del taller. */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-slate-950 font-sans text-slate-100 antialiased;
+    background-image:
+      radial-gradient(circle at 10% 20%, rgb(37 99 235 / 0.08), transparent 40%),
+      radial-gradient(circle at 90% 80%, rgb(139 92 246 / 0.08), transparent 40%);
+  }
+}
+
+@utility glass {
+  background: rgb(30 41 59 / 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
