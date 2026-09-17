@@ -83,7 +83,7 @@ class HistorianAgent:
                 await on_status("tool_call", call.name)
                 logger.info("tool_call", extra={"iteration": iteration, "tool": call.name, "arguments": call.arguments})
                 try:
-                    result = await self._tools.call(call.name, call.arguments)
+                    result = await self._tools.call(call.name, call.arguments, user_question=text)
                 except ToolError as exc:
                     logger.warning("tool_error", extra={"tool": call.name, "error": str(exc)})
                     result = f"ERROR de herramienta: {exc}"

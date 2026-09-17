@@ -48,14 +48,16 @@ class FakeTools(ToolRegistry):
         self._results = results or {}
         self._unavailable = unavailable
         self.calls: list[tuple[str, dict]] = []
+        self.user_questions: list[str | None] = []
 
     async def specs(self) -> list[ToolSpec]:
         if self._unavailable:
             raise ToolsUnavailable("fake caído")
         return [TOOL_SPEC]
 
-    async def call(self, name: str, arguments: dict) -> str:
+    async def call(self, name: str, arguments: dict, *, user_question: str | None = None) -> str:
         self.calls.append((name, arguments))
+        self.user_questions.append(user_question)
         return self._results[name]
 
 

@@ -20,7 +20,7 @@ def _agent(llm, tools, system_prompt="SYSTEM", **kwargs) -> HistorianAgent:
 
 async def test_criterio_3_dabbene_dispara_tool_y_la_respuesta_la_incorpora(store):
     system_prompt = build_system_prompt(ROOT_DIR / "ia_config", render_index(store.documents))
-    tool_output = render_documents(store.search("Lorenzo Dabbene"))
+    tool_output = render_documents(store.search("Lorenzo Dabbene").documents)
     llm = FakeLLM([
         LLMResponse(tool_calls=[ToolCall(name=TOOL_NAME, arguments={"tema": "Lorenzo Dabbene"})]),
         LLMResponse(content="El registro no menciona a Lorenzo: corresponde a Valter Dabbene (teoría de 1903)."),
@@ -34,10 +34,11 @@ async def test_criterio_3_dabbene_dispara_tool_y_la_respuesta_la_incorpora(store
 
     assert "Valter Dabbene" in answer
     assert tools.calls == [(TOOL_NAME, {"tema": "Lorenzo Dabbene"})]
+    assert tools.user_questions == ["¿Quién es Lorenzo Dabbene?"]  # viaja por _meta hasta la tool
     assert statuses == [("thinking", None), ("tool_call", TOOL_NAME), ("thinking", None)]
     second_call = llm.calls[1]
     system, *_, assistant, tool_message = second_call
-    assert "otro nombre de pila" in system.content
+    assert "mismo apellido" in system.content and system.content.rstrip().endswith("español.")
     assert tool_message.role == "tool"
     assert tool_message.tool_call_id == assistant.tool_calls[0].id
     assert "Valter Dabbene" in tool_message.content and "debates_origen_01" not in tool_message.content
@@ -104,7 +105,7 @@ async def test_sin_tools_no_consulta_al_modelo():
 
 async def test_error_de_tool_vuelve_al_modelo():
     class BrokenTools(FakeTools):
-        async def call(self, name, arguments):
+        async def call(self, name, arguments, *, user_question=None):
             raise ToolError("tema demasiado largo")
 
     llm = FakeLLM([

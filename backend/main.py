@@ -55,6 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         keep_alive=settings.ollama_keep_alive,
         connect_timeout=settings.ollama_connect_timeout,
         read_timeout=settings.ollama_read_timeout,
+        temperature=settings.ollama_temperature,
     )
     tools = McpToolRegistry(
         StdioServerParameters(

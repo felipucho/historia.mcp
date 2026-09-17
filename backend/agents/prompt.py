@@ -5,11 +5,16 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-RULES = """REGLAS:
-1. Para cualquier dato histórico (personas, fechas, lugares, teorías) usá la herramienta de búsqueda antes de responder. No respondas de memoria.
-2. Basate solo en lo que devuelve la herramienta. Si no hay datos, decí que no tenés esa información.
-3. Si el usuario nombra a una persona y el registro tiene otro nombre de pila con el mismo apellido, aclaralo explícitamente con el nombre del registro. Nunca confirmes un nombre que no figura en los documentos.
-4. Respondé en español, en pocas oraciones, citando la fuente del documento."""
+# Reglas cortas, imperativas y al final del prompt: un modelo de 3B sigue mejor lo último que lee.
+# Sin ejemplos con nombres propios: el modelo los copia literal en respuestas que no tienen nada que ver.
+RULES = """REGLAS OBLIGATORIAS:
+1. Para preguntas sobre la historia de Las Varillas, llamá primero a la herramienta de búsqueda con palabras clave concretas (nombres, fechas, lugares).
+2. Respondé solo con datos que aparecen en el resultado de la herramienta. No agregues datos, fechas, profesiones, parentescos ni suposiciones propias.
+3. Respondé la pregunta actual de forma directa, en 2 a 4 oraciones. No repitas respuestas anteriores.
+4. Si los documentos muestran varias teorías o fechas sobre lo preguntado, presentalas todas, cada una con su fuente. No elijas cuál es la correcta: los documentos presentan un debate abierto.
+5. Si el resultado trae un AVISO, seguilo: esa persona o dato no figura en los documentos y no hay que inventar relaciones. Si figura alguien con el mismo apellido, nombralo tal como aparece en el documento.
+6. Si la pregunta no trata sobre la historia de Las Varillas, respondé que solo podés ayudar con ese tema.
+7. Respondé siempre en español."""
 
 
 def _read(directory: Path, name: str, default: str) -> str:
@@ -32,7 +37,7 @@ def build_system_prompt(ia_config_dir: Path, index_text: str) -> str:
         f"Personalidad:\n{personalidad}",
         f"Instrucciones:\n{instrucciones}" if instrucciones else "",
         f"Contexto adicional:\n{conocimiento}" if conocimiento else "",
-        RULES,
         f"ÍNDICE DE DOCUMENTOS (solo títulos; el contenido se obtiene con la herramienta):\n{index_text}",
+        RULES,
     ]
     return "\n\n".join(section for section in sections if section)

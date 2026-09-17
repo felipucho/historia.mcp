@@ -52,6 +52,21 @@ async def test_payload_normalizado_a_formato_ollama():
     }
 
 
+async def test_temperatura_configurable_viaja_en_options():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return _chat_reply({"content": "ok"})
+
+    client = OllamaClient(
+        "http://ollama.test", "llama3.2", num_ctx=4096, keep_alive="5m", connect_timeout=5, read_timeout=90,
+        temperature=0.1, transport=httpx.MockTransport(handler),
+    )
+    await client.chat([Message(role="user", content="x")], [])
+    assert captured["options"] == {"num_ctx": 4096, "temperature": 0.1}
+
+
 async def test_tool_calls_nativas_reciben_id_si_ollama_no_lo_manda():
     def handler(request):
         return _chat_reply({"content": "", "tool_calls": [{"function": {"name": TOOL_NAME, "arguments": {"tema": "x"}}}]})

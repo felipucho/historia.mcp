@@ -36,11 +36,14 @@ class OllamaClient(LLMProvider):
         keep_alive: str,
         connect_timeout: float,
         read_timeout: float,
+        temperature: float | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._base_url = base_url
         self._model = model
-        self._num_ctx = num_ctx
+        self._options: dict[str, Any] = {"num_ctx": num_ctx}
+        if temperature is not None:
+            self._options["temperature"] = temperature
         self._keep_alive = keep_alive
         self._read_timeout = read_timeout
         # connect corto: Ollama caído se detecta en segundos. read largo: generación en CPU.
@@ -53,7 +56,7 @@ class OllamaClient(LLMProvider):
             "messages": [self._to_wire(message) for message in messages],
             "stream": False,
             "keep_alive": self._keep_alive,
-            "options": {"num_ctx": self._num_ctx},
+            "options": self._options,
         }
         if tools:
             payload["tools"] = [{"type": "function", "function": spec.model_dump()} for spec in tools]

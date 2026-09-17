@@ -11,6 +11,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import TextContent
 
 from llm.provider import ToolSpec
+from mcp_meta import USER_QUESTION_META
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class ToolRegistry(ABC):
         """Tools disponibles. Lanza ToolsUnavailable."""
 
     @abstractmethod
-    async def call(self, name: str, arguments: dict[str, Any]) -> str:
+    async def call(self, name: str, arguments: dict[str, Any], *, user_question: str | None = None) -> str:
         """Ejecuta una tool. Lanza ToolError o ToolsUnavailable."""
 
 
@@ -94,12 +95,13 @@ class McpToolRegistry(ToolRegistry):
             await self._ensure()
         return list(self._tools.values())
 
-    async def call(self, name: str, arguments: dict[str, Any]) -> str:
+    async def call(self, name: str, arguments: dict[str, Any], *, user_question: str | None = None) -> str:
         if name not in self._tools:
             raise ToolError(f"Herramienta desconocida: {name}. Disponibles: {', '.join(self._tools)}")
         client = await self._ensure()
+        meta = {USER_QUESTION_META: user_question} if user_question else None
         try:
-            result = await client.call_tool(name, arguments, read_timeout_seconds=self._call_timeout)
+            result = await client.call_tool(name, arguments, read_timeout_seconds=self._call_timeout, meta=meta)
         except MCPError as exc:
             if exc.code == _CONNECTION_CLOSED:
                 await self._invalidate(client)

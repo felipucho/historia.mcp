@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     ollama_model: str = Field("llama3.2", min_length=1)
     ollama_num_ctx: int = Field(8192, ge=2048)
     ollama_keep_alive: str = "30m"
+    # Respuestas factuales sobre documentos: con el default de Ollama (0.8) el modelo 3B inventa datos.
+    ollama_temperature: float = Field(0.1, ge=0, le=2)
     ollama_connect_timeout: float = Field(5.0, gt=0)
     ollama_read_timeout: float = Field(90.0, gt=0, le=300)
     ollama_required: bool = False
