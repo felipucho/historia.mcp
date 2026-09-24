@@ -2,12 +2,14 @@
 
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any
 
 import httpx
 
 from llm.provider import (
+    DeltaCallback,
     InvalidToolCall,
     LLMError,
     LLMProvider,
@@ -51,21 +53,58 @@ class OllamaClient(LLMProvider):
         self._client = httpx.AsyncClient(base_url=base_url, timeout=timeout, transport=transport)
 
     async def chat(self, messages: Sequence[Message], tools: Sequence[ToolSpec]) -> LLMResponse:
+        data = await self._request("POST", "/api/chat", json=self._payload(messages, tools, stream=False))
+        message = data.get("message")
+        if not isinstance(message, dict):
+            raise LLMError("Respuesta de Ollama sin 'message'")
+        return self._finish(message.get("content") or "", message.get("tool_calls") or [], tools)
+
+    async def chat_stream(self, messages: Sequence[Message], tools: Sequence[ToolSpec], on_delta: DeltaCallback) -> LLMResponse:
+        """NDJSON: cada línea trae un pedazo de message.content; las tool calls llegan enteras en alguna línea.
+
+        Si el texto arranca con '{' o '```' se retiene hasta el final: puede ser una tool call escrita
+        como JSON (ver _parse_text_tool_call) y no debe aparecer en el chat.
+        """
+        parts: list[str] = []
+        raw_calls: list[Any] = []
+        released = False
+        with self._errors():
+            async with self._client.stream("POST", "/api/chat", json=self._payload(messages, tools, stream=True)) as response:
+                if response.is_error:
+                    await response.aread()
+                    self._raise_for_status(response)
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    chunk = self._parse_line(line)
+                    message = chunk.get("message") or {}
+                    raw_calls.extend(message.get("tool_calls") or [])
+                    if not (delta := message.get("content")):
+                        continue
+                    parts.append(delta)
+                    if released:
+                        await on_delta(delta)
+                    elif (head := "".join(parts).lstrip()) and not head.startswith(("{", "`")):
+                        released = True
+                        await on_delta(head)
+        result = self._finish("".join(parts), raw_calls, tools)
+        if not released and result.content and not result.tool_calls:
+            await on_delta(result.content)
+        return result
+
+    def _payload(self, messages: Sequence[Message], tools: Sequence[ToolSpec], *, stream: bool) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": [self._to_wire(message) for message in messages],
-            "stream": False,
+            "stream": stream,
             "keep_alive": self._keep_alive,
             "options": self._options,
         }
         if tools:
             payload["tools"] = [{"type": "function", "function": spec.model_dump()} for spec in tools]
-        data = await self._request("POST", "/api/chat", json=payload)
-        message = data.get("message")
-        if not isinstance(message, dict):
-            raise LLMError("Respuesta de Ollama sin 'message'")
-        content = message.get("content") or ""
-        raw_calls = message.get("tool_calls") or []
+        return payload
+
+    def _finish(self, content: str, raw_calls: list[Any], tools: Sequence[ToolSpec]) -> LLMResponse:
         if raw_calls:
             return LLMResponse(content=content, tool_calls=[self._from_wire(raw) for raw in raw_calls])
         text_call = self._parse_text_tool_call(content, {spec.name for spec in tools})
@@ -88,18 +127,9 @@ class OllamaClient(LLMProvider):
         await self._client.aclose()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
-        try:
+        with self._errors():
             response = await self._client.request(method, path, **kwargs)
-        except httpx.ConnectTimeout as exc:
-            raise LLMUnavailable(f"Ollama no acepta conexiones en {self._base_url}") from exc
-        except httpx.TimeoutException as exc:
-            raise LLMTimeout(f"Ollama no respondió en {self._read_timeout:.0f}s") from exc
-        except httpx.TransportError as exc:
-            raise LLMUnavailable(f"No se pudo conectar a Ollama en {self._base_url}. ¿Está corriendo 'ollama serve'?") from exc
-        if response.status_code == 404:
-            raise LLMUnavailable(f"Modelo '{self._model}' no disponible en Ollama. Ejecutá: ollama pull {self._model}")
-        if response.is_error:
-            raise LLMError(f"Ollama respondió {response.status_code}: {response.text[:300]}")
+        self._raise_for_status(response)
         try:
             data = response.json()
         except ValueError as exc:
@@ -107,6 +137,37 @@ class OllamaClient(LLMProvider):
         if not isinstance(data, dict):
             raise LLMError("Ollama devolvió JSON inesperado")
         return data
+
+    @contextmanager
+    def _errors(self) -> Iterator[None]:
+        """Traduce errores de httpx a los del contrato. En stream cubre también la lectura de cada línea."""
+        try:
+            yield
+        except httpx.ConnectTimeout as exc:
+            raise LLMUnavailable(f"Ollama no acepta conexiones en {self._base_url}") from exc
+        except httpx.TimeoutException as exc:
+            raise LLMTimeout(f"Ollama no respondió en {self._read_timeout:.0f}s") from exc
+        except httpx.TransportError as exc:
+            raise LLMUnavailable(f"No se pudo conectar a Ollama en {self._base_url}. ¿Está corriendo 'ollama serve'?") from exc
+
+    def _raise_for_status(self, response: httpx.Response) -> None:
+        if response.status_code == 404:
+            raise LLMUnavailable(f"Modelo '{self._model}' no disponible en Ollama. Ejecutá: ollama pull {self._model}")
+        if response.is_error:
+            raise LLMError(f"Ollama respondió {response.status_code}: {response.text[:300]}")
+
+    @staticmethod
+    def _parse_line(line: str) -> dict[str, Any]:
+        try:
+            chunk = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise LLMError(f"Ollama mandó una línea que no es JSON: {line[:200]}") from exc
+        if not isinstance(chunk, dict):
+            raise LLMError("Ollama mandó una línea con JSON inesperado")
+        if "error" in chunk:
+            # Ollama informa errores a mitad del stream en una línea propia.
+            raise LLMError(f"Ollama cortó el stream: {str(chunk['error'])[:300]}")
+        return chunk
 
     @staticmethod
     def _to_wire(message: Message) -> dict[str, Any]:

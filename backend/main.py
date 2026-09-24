@@ -22,6 +22,7 @@ from api import rest, ws
 from api.ratelimit import ConnectionLimiter
 from config import BACKEND_DIR, Settings
 from llm.ollama import OllamaClient
+from llm.openai_compat import OpenAICompatClient
 from llm.provider import LLMError, LLMProvider
 from logging_config import setup_logging
 from store.history import HistoryStore, HistoryStoreError, render_index
@@ -57,6 +58,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         read_timeout=settings.ollama_read_timeout,
         temperature=settings.ollama_temperature,
     )
+    cloud = OpenAICompatClient(
+        settings.groq_base_url,
+        settings.groq_model,
+        settings.groq_api_key,
+        temperature=settings.cloud_temperature,
+        connect_timeout=settings.ollama_connect_timeout,
+        read_timeout=settings.cloud_read_timeout,
+    )
     tools = McpToolRegistry(
         StdioServerParameters(
             command=sys.executable,  # el python del venv activo: mismas dependencias que el backend
@@ -89,8 +98,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         system_prompt = build_system_prompt(settings.ia_config_dir, render_index(store.documents))
         app.state.settings = settings
         app.state.store = store
+        # Sin key el proveedor "cloud" no se registra: el agente responde provider_unavailable.
+        llms: dict[str, LLMProvider] = {"local": llm}
+        if settings.groq_api_key:
+            llms["cloud"] = cloud
+            logger.info("cloud_llm_configured", extra={"model": settings.groq_model})
         app.state.agent = HistorianAgent(
-            llm,
+            llms,
             tools,
             system_prompt,
             max_iterations=settings.agent_max_iterations,
@@ -104,15 +118,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.gather(warm_up, return_exceptions=True)
         await tools.aclose()
         await llm.aclose()
+        await cloud.aclose()
         logger.info("shutdown_complete")
 
 
 WS_DESCRIPTION = """
 ### WebSocket `/ws/chat`
-OpenAPI no describe WebSockets: el contrato está en los schemas `ChatIn`, `StatusEvent`, `ResponseEvent` y `ErrorEvent`.
+OpenAPI no describe WebSockets: el contrato está en los schemas `ChatIn`, `StatusEvent`, `DeltaEvent`, `ResponseEvent` y `ErrorEvent`.
 
-- Entrada: `ChatIn` → `{"text": "..."}` (1 a 1000 caracteres).
-- Salida: `StatusEvent` | `ResponseEvent` | `ErrorEvent`.
+- Entrada: `ChatIn` → `{"text": "...", "provider": "local" | "cloud"}` (1 a 1000 caracteres; provider opcional, default `local`).
+- Salida: `StatusEvent` | `DeltaEvent` | `ResponseEvent` | `ErrorEvent`. Los `delta` llegan mientras el modelo escribe; el `response` final trae el texto completo.
 - Origin fuera de `CORS_ORIGINS` → cierre `1008`.
 """
 

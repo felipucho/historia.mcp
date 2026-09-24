@@ -55,6 +55,8 @@ _GENERIC_TERMS = frozenset(
 )
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+# Cabecera de cada documento en render_documents: "[id] titulo". Mismo patrón que Documento.id.
+_RENDERED_ID_RE = re.compile(r"^\[([A-Za-z0-9][A-Za-z0-9_-]*)\] ", re.MULTILINE)
 _NAME_RE = re.compile(r"\b[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+)+")
 _MAX_NAME_WORDS = 3
 _FIELD_WEIGHTS = {"tags": 3, "titulo": 2, "contenido": 1}
@@ -222,3 +224,8 @@ def render_documents(documents: Iterable[Documento]) -> str:
         f"Contenido: {doc.contenido}"
         for doc in documents
     )
+
+
+def rendered_ids(text: str) -> list[str]:
+    """IDs de los documentos presentes en un texto armado por render_documents, en orden y sin repetir."""
+    return list(dict.fromkeys(_RENDERED_ID_RE.findall(text)))

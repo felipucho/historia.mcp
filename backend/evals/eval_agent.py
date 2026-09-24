@@ -75,7 +75,7 @@ class _RecordingTools(ToolRegistry):
         return result
 
 
-async def _noop_status(state: str, tool: str | None) -> None:
+async def _noop_status(state: str, tool: str | None, detail: str | None = None) -> None:
     return None
 
 

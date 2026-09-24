@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from store.history import HistoryStore, HistoryStoreError, tokenize
+from store.history import HistoryStore, HistoryStoreError, render_documents, render_index, rendered_ids, tokenize
 
 
 def _write(tmp_path, content: bytes | str):
@@ -156,3 +156,10 @@ def test_corpus_vacio(tmp_path):
 def test_acepta_bom_utf8(tmp_path):
     path = _write(tmp_path, codecs.BOM_UTF8 + json.dumps([_doc()]).encode("utf-8"))
     assert HistoryStore.from_file(path).documents[0].id == "doc_1"
+
+
+def test_rendered_ids_extrae_cabeceras_sin_repetir(store):
+    docs = list(store.documents)
+    text = render_documents([docs[1], docs[0], docs[1]])
+    assert rendered_ids(text) == [docs[1].id, docs[0].id]
+    assert rendered_ids(render_index(docs)) == []

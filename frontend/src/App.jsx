@@ -1,11 +1,11 @@
 import { ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
-import { useCallback, useEffect, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 
 import ChatDrawer from './components/ChatDrawer.jsx'
 import Reader from './components/Reader.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import { useWebSocket } from './hooks/useWebSocket.js'
-import { fetchFundacion } from './services/api.js'
+import { fetchFundacion, fetchModelos } from './services/api.js'
 import { chatSocketUrl } from './services/ws.js'
 
 const SOCKET_URL = chatSocketUrl()
@@ -16,20 +16,50 @@ const initialChat = {
   pending: false,
   agentState: 'idle',
   tool: null,
+  detail: null,
+  // Texto que el modelo va generando en el turno en curso; el evento response lo reemplaza por el final.
+  streaming: '',
+  streamingProvider: null,
 }
 
+// Si /api/modelos falla, el selector igual ofrece el local: es el único que no depende de configuración.
+const FALLBACK_MODELS = [{ id: 'local', nombre: 'Local', disponible: true }]
+
 // Lista append-only: el índice sirve de id estable y el reducer queda puro.
-const append = (chat, role, content) => [...chat.messages, { id: chat.messages.length, role, content }]
-const settle = { pending: false, agentState: 'idle', tool: null }
+const append = (chat, role, content, extra) => [...chat.messages, { id: chat.messages.length, role, content, ...extra }]
+const settle = { pending: false, agentState: 'idle', tool: null, detail: null, streaming: '' }
 
 function chatReducer(chat, action) {
   switch (action.type) {
     case 'sent':
-      return { ...chat, messages: append(chat, 'user', action.text), pending: true, agentState: 'sending', tool: null }
+      return {
+        ...chat,
+        messages: append(chat, 'user', action.text),
+        pending: true,
+        agentState: 'sending',
+        tool: null,
+        detail: null,
+        streaming: '',
+        streamingProvider: action.provider,
+      }
     case 'status':
-      return action.state === 'idle' ? chat : { ...chat, agentState: action.state, tool: action.tool ?? null }
+      if (action.state === 'idle') return chat
+      // tool_call: lo escrito antes era un preámbulo del modelo, no la respuesta.
+      return {
+        ...chat,
+        agentState: action.state,
+        tool: action.tool ?? null,
+        detail: action.detail ?? null,
+        streaming: action.state === 'tool_call' ? '' : chat.streaming,
+      }
+    case 'delta':
+      return chat.pending ? { ...chat, streaming: chat.streaming + action.content } : chat
     case 'response':
-      return { ...chat, ...settle, messages: append(chat, 'assistant', action.content) }
+      return {
+        ...chat,
+        ...settle,
+        messages: append(chat, 'assistant', action.content, { provider: action.provider, sources: action.sources ?? [] }),
+      }
     case 'error':
       // busy: el turno anterior sigue en curso, el indicador no se corta.
       return action.code === 'busy'
@@ -50,6 +80,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(() => !window.matchMedia(MOBILE_QUERY).matches)
   const [chatOpen, setChatOpen] = useState(false)
   const [chat, dispatch] = useReducer(chatReducer, initialChat)
+  const [models, setModels] = useState(FALLBACK_MODELS)
+  const [provider, setProvider] = useState('local')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -61,22 +93,32 @@ export default function App() {
     return () => controller.abort()
   }, [])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchModelos(controller.signal)
+      .then(setModels)
+      .catch(() => {}) // sin la lista queda el local: el chat sigue funcionando
+    return () => controller.abort()
+  }, [])
+
+  const docsById = useMemo(() => new Map(docs.map((doc) => [doc.id, doc])), [docs])
+
   const { status: connection, send } = useWebSocket(SOCKET_URL, {
-    // parseServerEvent solo deja pasar status/response/error: cada evento es una acción del reducer.
+    // parseServerEvent solo deja pasar status/delta/response/error: cada evento es una acción del reducer.
     onEvent: dispatch,
     onClose: () => dispatch({ type: 'closed' }),
   })
 
   const handleSend = useCallback(
     (text) => {
-      if (!send({ text })) {
+      if (!send({ text, provider })) {
         dispatch({ type: 'offline' })
         return false
       }
-      dispatch({ type: 'sent', text })
+      dispatch({ type: 'sent', text, provider })
       return true
     },
-    [send],
+    [send, provider],
   )
 
   const navigate = useCallback((id) => {
@@ -89,6 +131,15 @@ export default function App() {
   }, [])
 
   const closeChat = useCallback(() => setChatOpen(false), [])
+
+  // Cita del chat: cierra el drawer (tapa el lector) y salta al documento.
+  const openSource = useCallback(
+    (id) => {
+      setChatOpen(false)
+      navigate(id)
+    },
+    [navigate],
+  )
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -134,8 +185,16 @@ export default function App() {
         pending={chat.pending}
         agentState={chat.agentState}
         tool={chat.tool}
+        detail={chat.detail}
+        streaming={chat.streaming}
+        streamingProvider={chat.streamingProvider}
         connection={connection}
         onSend={handleSend}
+        models={models}
+        provider={provider}
+        onProviderChange={setProvider}
+        docsById={docsById}
+        onOpenSource={openSource}
       />
     </div>
   )

@@ -2,10 +2,14 @@
 
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
+
+
+# Recibe cada pedazo de texto de la respuesta a medida que el modelo lo genera.
+DeltaCallback = Callable[[str], Awaitable[None]]
 
 
 def new_tool_call_id() -> str:
@@ -62,6 +66,17 @@ class InvalidToolCall(LLMError):
 class LLMProvider(ABC):
     @abstractmethod
     async def chat(self, messages: Sequence[Message], tools: Sequence[ToolSpec]) -> LLMResponse: ...
+
+    async def chat_stream(self, messages: Sequence[Message], tools: Sequence[ToolSpec], on_delta: DeltaCallback) -> LLMResponse:
+        """Igual que chat, pero emite el texto por on_delta mientras se genera. Devuelve la respuesta completa.
+
+        Por defecto no hay stream real: emite el texto entero al final. Solo se emite texto de respuestas
+        sin tool calls, salvo que el proveedor ya lo haya mandado antes de saber que venía una tool call.
+        """
+        response = await self.chat(messages, tools)
+        if response.content and not response.tool_calls:
+            await on_delta(response.content)
+        return response
 
     @abstractmethod
     async def health(self) -> None:

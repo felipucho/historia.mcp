@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     ollama_read_timeout: float = Field(90.0, gt=0, le=300)
     ollama_required: bool = False
 
+    # Modelo en la nube (Groq, API OpenAI-compatible). Sin key el selector lo muestra deshabilitado.
+    groq_api_key: str = ""
+    groq_url: HttpUrl = HttpUrl("https://api.groq.com/openai/v1")
+    groq_model: str = Field("openai/gpt-oss-120b", min_length=1)
+    # Un modelo grande sigue las reglas sin necesitar 0.1; más bajo responde acartonado.
+    cloud_temperature: float = Field(0.3, ge=0, le=2)
+    cloud_read_timeout: float = Field(30.0, gt=0, le=300)
+
     mcp_connect_timeout: float = Field(20.0, gt=0)
     mcp_call_timeout: float = Field(15.0, gt=0)
     mcp_retry_base: float = Field(2.0, gt=0)
@@ -65,3 +73,7 @@ class Settings(BaseSettings):
     @property
     def ollama_base_url(self) -> str:
         return str(self.ollama_url).rstrip("/")
+
+    @property
+    def groq_base_url(self) -> str:
+        return str(self.groq_url).rstrip("/")

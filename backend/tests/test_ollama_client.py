@@ -159,3 +159,83 @@ async def test_health_acepta_tag_latest():
         return httpx.Response(200, json={"models": [{"name": "llama3.2:latest", "model": "llama3.2:latest"}]})
 
     await _client(handler).health()
+
+
+def _ndjson(*chunks: dict) -> httpx.Response:
+    return httpx.Response(200, content="\n".join(json.dumps(chunk) for chunk in chunks).encode())
+
+
+async def _stream(client: OllamaClient, tools=(TOOL_SPEC,)):
+    deltas: list[str] = []
+
+    async def on_delta(text: str) -> None:
+        deltas.append(text)
+
+    response = await client.chat_stream([Message(role="user", content="x")], list(tools), on_delta)
+    return response, deltas
+
+
+async def test_stream_emite_cada_pedazo_y_devuelve_el_texto_completo():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return _ndjson(
+            {"message": {"role": "assistant", "content": "Llegó "}, "done": False},
+            {"message": {"role": "assistant", "content": "en 1900."}, "done": False},
+            {"message": {"role": "assistant", "content": ""}, "done": True},
+        )
+
+    response, deltas = await _stream(_client(handler))
+    assert captured["body"]["stream"] is True
+    assert deltas == ["Llegó ", "en 1900."]
+    assert response.content == "Llegó en 1900." and response.tool_calls == []
+
+
+async def test_stream_tool_call_nativa_no_emite_texto():
+    def handler(request: httpx.Request) -> httpx.Response:
+        call = {"function": {"name": TOOL_NAME, "arguments": {"tema": "tren"}}}
+        return _ndjson({"message": {"content": "", "tool_calls": [call]}, "done": False}, {"message": {"content": ""}, "done": True})
+
+    response, deltas = await _stream(_client(handler))
+    assert deltas == []
+    assert response.tool_calls[0].arguments == {"tema": "tren"}
+
+
+async def test_stream_retiene_json_que_resulta_ser_tool_call():
+    # Un 3B a veces escribe la tool call como texto: no debe aparecer en el chat.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _ndjson(
+            {"message": {"content": '{"name": "'}},
+            {"message": {"content": TOOL_NAME + '", "parameters": {"tema": "tren"}}'}},
+            {"message": {"content": ""}, "done": True},
+        )
+
+    response, deltas = await _stream(_client(handler))
+    assert deltas == []
+    assert response.tool_calls[0].name == TOOL_NAME
+
+
+async def test_stream_json_que_no_es_tool_call_se_emite_al_final():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _ndjson({"message": {"content": "{no es "}}, {"message": {"content": "json}"}}, {"done": True})
+
+    response, deltas = await _stream(_client(handler))
+    assert deltas == ["{no es json}"]
+    assert response.content == "{no es json}"
+
+
+async def test_stream_error_a_mitad_es_llm_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _ndjson({"message": {"content": "Hola"}}, {"error": "model runner crashed"})
+
+    with pytest.raises(LLMError, match="cortó"):
+        await _stream(_client(handler))
+
+
+async def test_stream_modelo_ausente_sugiere_pull():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": "model not found"})
+
+    with pytest.raises(LLMUnavailable, match="ollama pull"):
+        await _stream(_client(handler))

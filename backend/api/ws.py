@@ -9,11 +9,12 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
 
-from agents.historian import Conversation, HistorianAgent, MaxIterationsExceeded
+from agents.historian import DEFAULT_PROVIDER, Conversation, HistorianAgent, MaxIterationsExceeded, UnknownProvider
 from api.ratelimit import TokenBucket
 from config import Settings
 from llm.provider import LLMError, LLMTimeout, LLMUnavailable
 from logging_config import conn_id_var
+from store.history import rendered_ids
 from tools.registry import ToolsUnavailable
 
 logger = logging.getLogger(__name__)
@@ -27,8 +28,9 @@ _BIDI_CONTROLS = dict.fromkeys(map(ord, "‪‫‬‭‮⁦⁧⁨⁩"))
 
 ErrorCode = Literal[
     "llm_unavailable", "llm_timeout", "tools_unavailable", "busy",
-    "rate_limited", "invalid_input", "max_iterations", "internal",
+    "rate_limited", "invalid_input", "max_iterations", "internal", "provider_unavailable",
 ]
+Provider = Literal["local", "cloud"]
 
 
 def sanitize_text(value: str) -> str:
@@ -48,6 +50,7 @@ class ChatIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     text: Annotated[str, AfterValidator(sanitize_text)]
+    provider: Provider = DEFAULT_PROVIDER
 
 
 class StatusEvent(BaseModel):
@@ -56,6 +59,14 @@ class StatusEvent(BaseModel):
     type: Literal["status"] = "status"
     state: Literal["thinking", "tool_call", "idle"]
     tool: str | None = None
+    detail: str | None = None
+
+
+class DeltaEvent(BaseModel):
+    """Servidor → cliente: pedazo de texto mientras el modelo genera. El ResponseEvent final trae el texto completo."""
+
+    type: Literal["delta"] = "delta"
+    content: str
 
 
 class ResponseEvent(BaseModel):
@@ -63,6 +74,9 @@ class ResponseEvent(BaseModel):
 
     type: Literal["response"] = "response"
     content: str
+    provider: Provider
+    # IDs de los documentos que devolvió la tool en este turno: el frontend los muestra como citas.
+    sources: list[str] | None = None
 
 
 class ErrorEvent(BaseModel):
@@ -73,7 +87,7 @@ class ErrorEvent(BaseModel):
     message: str
 
 
-WS_SCHEMAS = (ChatIn, StatusEvent, ResponseEvent, ErrorEvent)
+WS_SCHEMAS = (ChatIn, StatusEvent, DeltaEvent, ResponseEvent, ErrorEvent)
 
 
 class _Channel:
@@ -100,13 +114,27 @@ def _parse(text: str | None) -> ChatIn:
         raise ValueError(str(exc)) from exc
 
 
-async def _run_turn(channel: _Channel, agent: HistorianAgent, conversation: Conversation, text: str) -> None:
-    async def on_status(state: Literal["thinking", "tool_call"], tool: str | None) -> None:
-        await channel.send(StatusEvent(state=state, tool=tool))
+async def _run_turn(
+    channel: _Channel, agent: HistorianAgent, conversation: Conversation, text: str, provider: Provider
+) -> None:
+    async def on_status(state: Literal["thinking", "tool_call"], tool: str | None, detail: str | None = None) -> None:
+        await channel.send(StatusEvent(state=state, tool=tool, detail=detail))
+
+    async def on_delta(content: str) -> None:
+        await channel.send(DeltaEvent(content=content))
+
+    sources: list[str] = []
+
+    def on_tool_result(result: str) -> None:
+        sources.extend(doc_id for doc_id in rendered_ids(result) if doc_id not in sources)
 
     event: BaseModel
     try:
-        event = ResponseEvent(content=await agent.run(conversation, text, on_status))
+        content = await agent.run(conversation, text, on_status, provider=provider, on_tool_result=on_tool_result, on_delta=on_delta)
+        event = ResponseEvent(content=content, provider=provider, sources=sources or None)
+    except UnknownProvider as exc:
+        logger.warning("turn_unknown_provider", extra={"error": str(exc)})
+        event = ErrorEvent(code="provider_unavailable", message="El modelo en la nube no está configurado. Falta GROQ_API_KEY en .env.")
     except ToolsUnavailable as exc:
         logger.error("turn_tools_unavailable", extra={"error": str(exc)})
         event = ErrorEvent(code="tools_unavailable", message="La base histórica no está disponible. Probá de nuevo en unos segundos.")
@@ -114,8 +142,15 @@ async def _run_turn(channel: _Channel, agent: HistorianAgent, conversation: Conv
         logger.error("turn_llm_timeout", extra={"error": str(exc)})
         event = ErrorEvent(code="llm_timeout", message="El modelo tardó demasiado en responder. Probá de nuevo.")
     except LLMUnavailable as exc:
-        logger.error("turn_llm_unavailable", extra={"error": str(exc)})
-        event = ErrorEvent(code="llm_unavailable", message="El modelo de lenguaje no está disponible. Verificá que Ollama esté corriendo.")
+        logger.error("turn_llm_unavailable", extra={"error": str(exc), "provider": provider})
+        # Los mensajes del cliente en la nube son aptos para el usuario (key faltante, límite gratuito).
+        # Los de Ollama llevan URLs internas: se reemplazan por uno genérico.
+        message = (
+            "El modelo de lenguaje no está disponible. Verificá que Ollama esté corriendo."
+            if provider == "local"
+            else f"{exc}. Probá con el modelo local."
+        )
+        event = ErrorEvent(code="llm_unavailable", message=message)
     except MaxIterationsExceeded:
         event = ErrorEvent(code="max_iterations", message="No llegué a una respuesta final. Probá reformular la pregunta.")
     except LLMError as exc:
@@ -170,7 +205,7 @@ async def chat_socket(websocket: WebSocket) -> None:
                 logger.info("ws_invalid_input", extra={"error": str(exc)[:300]})
                 await channel.send(ErrorEvent(code="invalid_input", message=f'Enviá {{"text": ...}} con 1 a {MAX_TEXT_CHARS} caracteres.'))
                 continue
-            turn = asyncio.create_task(_run_turn(channel, state.agent, conversation, incoming.text))
+            turn = asyncio.create_task(_run_turn(channel, state.agent, conversation, incoming.text, incoming.provider))
     except WebSocketDisconnect:
         pass
     finally:

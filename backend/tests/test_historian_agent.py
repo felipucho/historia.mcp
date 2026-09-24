@@ -10,7 +10,7 @@ from tools.registry import ToolError, ToolsUnavailable
 
 
 class _Statuses(list):
-    async def __call__(self, state, tool):
+    async def __call__(self, state, tool, detail=None):
         self.append((state, tool))
 
 
@@ -132,3 +132,20 @@ async def test_error_del_llm_no_deja_turno_a_medias():
 async def test_respuesta_vacia():
     agent = _agent(FakeLLM([LLMResponse(content="   ")]), FakeTools())
     assert await agent.run(agent.new_conversation(), "x", _Statuses()) == EMPTY_ANSWER
+
+
+async def test_on_delta_emite_solo_la_respuesta_final():
+    llm = FakeLLM([
+        LLMResponse(tool_calls=[ToolCall(name=TOOL_NAME, arguments={"tema": "tren"})]),
+        LLMResponse(content="Llegó en 1900."),
+    ])
+    agent = _agent(llm, FakeTools({TOOL_NAME: "doc"}))
+    deltas: list[str] = []
+
+    async def on_delta(text: str) -> None:
+        deltas.append(text)
+
+    answer = await agent.run(agent.new_conversation(), "¿Cuándo llegó el tren?", _Statuses(), on_delta=on_delta)
+
+    assert answer == "Llegó en 1900."
+    assert deltas == ["Llegó en 1900."]  # la iteración con tool call no emite texto

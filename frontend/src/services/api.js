@@ -10,3 +10,16 @@ export async function fetchFundacion(signal) {
   }
   return data
 }
+
+/** GET /api/modelos → [{ id: 'local' | 'cloud', nombre, disponible }]. */
+export async function fetchModelos(signal) {
+  const response = await fetch('/api/modelos', { signal, headers: { Accept: 'application/json' } })
+  if (!response.ok) {
+    throw new Error(`el backend respondió ${response.status}`)
+  }
+  const data = await response.json()
+  if (!Array.isArray(data)) {
+    throw new Error('respuesta inesperada de /api/modelos')
+  }
+  return data
+}
