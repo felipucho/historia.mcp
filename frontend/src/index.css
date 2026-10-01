@@ -12,7 +12,7 @@
   }
 
   body {
-    @apply bg-slate-950 font-sans text-slate-100 antialiased;
+    @apply bg-slate-900 font-sans text-slate-100 antialiased;
     background-image:
       radial-gradient(circle at 10% 20%, rgb(37 99 235 / 0.08), transparent 40%),
       radial-gradient(circle at 90% 80%, rgb(139 92 246 / 0.08), transparent 40%);

@@ -6,7 +6,7 @@ from config import ROOT_DIR
 from llm.provider import LLMResponse, LLMUnavailable, ToolCall
 from store.history import render_documents, render_index
 from tests.conftest import TOOL_NAME, FakeLLM, FakeTools
-from tools.registry import ToolError, ToolsUnavailable
+from tools.base import ToolError, ToolsUnavailable
 
 
 class _Statuses(list):

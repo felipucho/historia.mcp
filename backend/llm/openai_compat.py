@@ -92,7 +92,7 @@ class OpenAICompatClient(LLMProvider):
 
     def _require_key(self) -> None:
         if not self._api_key:
-            raise LLMUnavailable("Falta la API key del modelo en la nube (GROQ_API_KEY en .env)")
+            raise LLMUnavailable("Falta la API key del modelo en la nube (GROQ_API_KEY en .env)", public=True)
 
     def _payload(self, messages: Sequence[Message], tools: Sequence[ToolSpec], *, stream: bool) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -127,19 +127,19 @@ class OpenAICompatClient(LLMProvider):
         except httpx.TimeoutException as exc:
             raise LLMTimeout(f"El modelo en la nube no respondió en {self._read_timeout:.0f}s") from exc
         except httpx.TransportError as exc:
-            raise LLMUnavailable(f"No se pudo conectar a {self._base_url}") from exc
+            raise LLMUnavailable(f"No se pudo conectar a {self._base_url}", public=True) from exc
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
         if response.status_code in (401, 403):
-            raise LLMUnavailable("API key del modelo en la nube inválida o revocada")
+            raise LLMUnavailable("API key del modelo en la nube inválida o revocada", public=True)
         if response.status_code == 429:
-            raise LLMUnavailable("Se agotó el límite gratuito del modelo en la nube")
+            raise LLMUnavailable("Se agotó el límite gratuito del modelo en la nube", public=True)
         if response.status_code == 400 and "tool_use_failed" in response.text:
             # Groq valida la tool call del modelo y devuelve 400 si está mal formada.
             raise InvalidToolCall(f"El modelo generó una llamada a herramienta inválida: {response.text[:300]}")
         if response.status_code == 404 and "model_not_found" in response.text:
-            raise LLMUnavailable("El modelo configurado en GROQ_MODEL no existe en Groq")
+            raise LLMUnavailable("El modelo configurado en GROQ_MODEL no existe en Groq", public=True)
         if response.is_error:
             raise LLMError(f"El modelo en la nube respondió {response.status_code}: {response.text[:300]}")
 

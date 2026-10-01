@@ -1,5 +1,6 @@
 """Logging JSON centralizado. El conn_id viaja por contextvar: el agente loguea con contexto sin conocer el transporte."""
 
+import io
 import json
 import logging
 import sys
@@ -30,10 +31,11 @@ class JsonFormatter(logging.Formatter):
 
 def setup_logging(level: str, stream: TextIO = sys.stdout) -> None:
     """stream=sys.stderr en el servidor MCP: su stdout es el canal del protocolo."""
-    try:
-        stream.reconfigure(encoding="utf-8")  # consola Windows en cp1252
-    except (AttributeError, ValueError):
-        pass
+    if isinstance(stream, io.TextIOWrapper):  # un StringIO (tests) no tiene reconfigure
+        try:
+            stream.reconfigure(encoding="utf-8")  # consola Windows en cp1252
+        except ValueError:
+            pass
     handler = logging.StreamHandler(stream)
     handler.setFormatter(JsonFormatter())
     root = logging.getLogger()

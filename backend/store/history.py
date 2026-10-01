@@ -34,24 +34,13 @@ _CORPUS = TypeAdapter(list[Documento])
 
 # Sin acentos: se comparan contra texto ya normalizado.
 STOPWORDS = frozenset(
-    """
-    a al algo ante antes cada como con contame cual cuales cuando cuanto de decime del desde
-    dime donde e el ella ellas ellos en entre era es esa ese eso esta este esto fue fueron ha
-    habia hablame hay la las le les lo los mas me mi muy nada ni no nos o para pero por porque
-    que quien quienes se segun ser si sin sobre son su sus te tiene tu un una unas uno unos y ya yo
-    """.split()
+    ["a", "al", "algo", "ante", "antes", "cada", "como", "con", "contame", "cual", "cuales", "cuando", "cuanto", "de", "decime", "del", "desde", "dime", "donde", "e", "el", "ella", "ellas", "ellos", "en", "entre", "era", "es", "esa", "ese", "eso", "esta", "este", "esto", "fue", "fueron", "ha", "habia", "hablame", "hay", "la", "las", "le", "les", "lo", "los", "mas", "me", "mi", "muy", "nada", "ni", "no", "nos", "o", "para", "pero", "por", "porque", "que", "quien", "quienes", "se", "segun", "ser", "si", "sin", "sobre", "son", "su", "sus", "te", "tiene", "tu", "un", "una", "unas", "uno", "unos", "y", "ya", "yo"]
 )
 
 # Palabras sobre la consulta misma o el tema general del corpus. Si no están en los documentos no cuentan
 # como término faltante: avisar "no hay registros de «historia»" rompía la pregunta más común.
 _GENERIC_TERMS = frozenset(
-    """
-    acerca ayudame ayudar buen buenas buenos ciudad conoce conocer conoces conta contar contas conto cosa
-    cosas dato datos deci decir decis dia dias documento documentos explica explicame explicar fuente fuentes
-    general gracias historia historias historica historicas historico historicos hola info informacion noches
-    ocurrio origen origenes pasado paso podes podrias puede puedes queria quiero quisiera respecto resumen
-    sabe saber sabes sabias sucedio tardes tema temas
-    """.split()
+    ["acerca", "ano", "anos", "ayudame", "ayudar", "buen", "buenas", "buenos", "ciudad", "conoce", "conocer", "conoces", "conta", "contar", "contas", "conto", "cosa", "cosas", "dato", "datos", "deci", "decir", "decis", "dia", "dias", "documento", "documentos", "explica", "explicame", "explicar", "fecha", "fechas", "fuente", "fuentes", "general", "gracias", "historia", "historias", "historica", "historicas", "historico", "historicos", "hola", "info", "informacion", "noches", "ocurrio", "origen", "origenes", "pasado", "paso", "podes", "podrias", "puede", "puedes", "queria", "quiero", "quisiera", "respecto", "resumen", "sabe", "saber", "sabes", "sabias", "sucedio", "tardes", "tema", "temas"]
 )
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")

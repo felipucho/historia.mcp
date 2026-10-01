@@ -15,7 +15,14 @@ from pydantic import Field
 from config import Settings
 from logging_config import setup_logging
 from mcp_meta import USER_QUESTION_MAX_CHARS, USER_QUESTION_META
-from store.history import HistoryStore, HistoryStoreError, normalize, render_documents, render_index, tokenize
+from store.history import (
+    HistoryStore,
+    HistoryStoreError,
+    normalize,
+    render_documents,
+    render_index,
+    tokenize,
+)
 
 logger = logging.getLogger("mcp_server")
 

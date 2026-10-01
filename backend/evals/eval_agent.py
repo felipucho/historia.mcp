@@ -21,7 +21,8 @@ from llm.ollama import OllamaClient
 from llm.provider import ToolSpec
 from mcp_server import build_server
 from store.history import HistoryStore, render_index
-from tools.registry import McpToolRegistry, ToolRegistry
+from tools.base import ToolRegistry
+from tools.registry import McpToolRegistry
 
 NO_INFO = r"no (tengo|cuento|dispongo|hay|encontr|figura|aparece)|sin informaci|no se menciona|no est[aá] (document|registr)"
 SPECULATION = (
@@ -70,7 +71,7 @@ class _RecordingTools(ToolRegistry):
 
     async def call(self, name: str, arguments: dict[str, Any], *, user_question: str | None = None) -> str:
         result = await self._inner.call(name, arguments, user_question=user_question)
-        hits = re.findall(r"^\[(\w+)\]", result, re.M)
+        hits = re.findall(r"^\[(\w+)\]", result, re.MULTILINE)
         self.log.append(f"{arguments} -> {hits or result[:60].replace(chr(10), ' ')}")
         return result
 
@@ -109,8 +110,8 @@ async def run(scenarios: dict, repetitions: int, temperature: float | None) -> i
                         answer = await agent.run(conversation, question, _noop_status)
                     except Exception as exc:  # noqa: BLE001 - un fallo del turno es un resultado del eval
                         answer = f"<<{type(exc).__name__}: {exc}>>"
-                    problems = [f"falta /{r}/" for r in required if not re.search(r, answer, re.I)]
-                    problems += [f"prohibido /{r}/" for r in forbidden if re.search(r, answer, re.I)]
+                    problems = [f"falta /{r}/" for r in required if not re.search(r, answer, re.IGNORECASE)]
+                    problems += [f"prohibido /{r}/" for r in forbidden if re.search(r, answer, re.IGNORECASE)]
                     total += 1
                     if problems:
                         failures[f"{name}: {question}"] += 1

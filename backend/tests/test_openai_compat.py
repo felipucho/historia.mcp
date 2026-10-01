@@ -4,7 +4,14 @@ import httpx
 import pytest
 
 from llm.openai_compat import OpenAICompatClient
-from llm.provider import InvalidToolCall, LLMError, LLMTimeout, LLMUnavailable, Message, ToolCall
+from llm.provider import (
+    InvalidToolCall,
+    LLMError,
+    LLMTimeout,
+    LLMUnavailable,
+    Message,
+    ToolCall,
+)
 from tests.conftest import TOOL_NAME, TOOL_SPEC
 
 

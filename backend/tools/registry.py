@@ -1,17 +1,17 @@
-"""Registro de herramientas. McpToolRegistry descubre las tools del servidor MCP: agregar una tool no toca main.py."""
+"""Implementación MCP del contrato de tools.base. McpToolRegistry descubre las tools del servidor MCP: agregar una tool no toca main.py."""
 
 import asyncio
 import logging
 import time
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, cast
 
 from mcp import Client, MCPError, StdioServerParameters
 from mcp.server.mcpserver import MCPServer
-from mcp.types import TextContent
+from mcp.types import RequestParamsMeta, TextContent
 
 from llm.provider import ToolSpec
 from mcp_meta import USER_QUESTION_META
+from tools.base import ToolError, ToolRegistry, ToolsUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -29,24 +29,6 @@ async def _fetch_tools(client: Client) -> dict[str, ToolSpec]:
             tools[tool.name] = ToolSpec(name=tool.name, description=tool.description or "", parameters=tool.input_schema)
         if not (cursor := listing.next_cursor):
             return tools
-
-
-class ToolError(Exception):
-    """La herramienta falló. El mensaje vuelve al modelo como resultado de la tool."""
-
-
-class ToolsUnavailable(Exception):
-    """El backend de herramientas no está disponible."""
-
-
-class ToolRegistry(ABC):
-    @abstractmethod
-    async def specs(self) -> list[ToolSpec]:
-        """Tools disponibles. Lanza ToolsUnavailable."""
-
-    @abstractmethod
-    async def call(self, name: str, arguments: dict[str, Any], *, user_question: str | None = None) -> str:
-        """Ejecuta una tool. Lanza ToolError o ToolsUnavailable."""
 
 
 class McpToolRegistry(ToolRegistry):
@@ -89,7 +71,7 @@ class McpToolRegistry(ToolRegistry):
         client = await self._ensure()
         try:
             self._tools = await asyncio.wait_for(_fetch_tools(client), _LIVENESS_TIMEOUT)
-        except Exception as exc:  # proceso muerto o colgado: se reconecta en este mismo mensaje
+        except Exception as exc:  # noqa: BLE001 - proceso muerto o colgado: se reconecta en este mismo mensaje
             logger.warning("mcp_liveness_failed", extra={"error": repr(exc)})
             await self._invalidate(client)
             await self._ensure()
@@ -99,7 +81,7 @@ class McpToolRegistry(ToolRegistry):
         if name not in self._tools:
             raise ToolError(f"Herramienta desconocida: {name}. Disponibles: {', '.join(self._tools)}")
         client = await self._ensure()
-        meta = {USER_QUESTION_META: user_question} if user_question else None
+        meta = cast(RequestParamsMeta, {USER_QUESTION_META: user_question}) if user_question else None
         try:
             result = await client.call_tool(name, arguments, read_timeout_seconds=self._call_timeout, meta=meta)
         except MCPError as exc:
@@ -183,5 +165,5 @@ class McpToolRegistry(ToolRegistry):
             await asyncio.wait_for(task, _STOP_TIMEOUT)
         except TimeoutError:
             logger.warning("mcp_stop_timeout")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - el cierre no debe fallar por un hijo en mal estado
             logger.warning("mcp_stop_error", extra={"error": repr(exc)})

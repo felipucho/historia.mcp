@@ -6,7 +6,7 @@ import pytest
 from config import ROOT_DIR
 from llm.provider import LLMProvider, LLMResponse, Message, ToolSpec
 from store.history import HistoryStore
-from tools.registry import ToolRegistry, ToolsUnavailable
+from tools.base import ToolError, ToolRegistry, ToolsUnavailable
 
 TOOL_NAME = "consultar_fundacion_las_varillas"
 TOOL_SPEC = ToolSpec(
@@ -58,6 +58,8 @@ class FakeTools(ToolRegistry):
     async def call(self, name: str, arguments: dict, *, user_question: str | None = None) -> str:
         self.calls.append((name, arguments))
         self.user_questions.append(user_question)
+        if name not in self._results:
+            raise ToolError(f"Herramienta desconocida: {name}")
         return self._results[name]
 
 

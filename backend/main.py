@@ -26,7 +26,8 @@ from llm.openai_compat import OpenAICompatClient
 from llm.provider import LLMError, LLMProvider
 from logging_config import setup_logging
 from store.history import HistoryStore, HistoryStoreError, render_index
-from tools.registry import McpToolRegistry, ToolsUnavailable
+from tools.base import ToolsUnavailable
+from tools.registry import McpToolRegistry
 
 settings = Settings()
 setup_logging(settings.log_level)

@@ -2,22 +2,27 @@
 
 import logging
 from collections import deque
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from itertools import chain
-from typing import Literal
+from typing import Any, Final, Literal, Protocol
 
 from llm.provider import DeltaCallback, LLMProvider, Message
-from tools.registry import ToolError, ToolRegistry
+from tools.base import ToolError, ToolRegistry
 
 logger = logging.getLogger(__name__)
 
 AgentState = Literal["thinking", "tool_call"]
-# detail: el primer argumento de texto de la tool (ej: el tema buscado), para mostrarlo en la UI.
-StatusCallback = Callable[..., Awaitable[None]]
+
+
+class StatusCallback(Protocol):
+    # detail: el primer argumento de texto de la tool (ej: el tema buscado), para mostrarlo en la UI.
+    async def __call__(self, state: AgentState, tool: str | None, detail: str | None = None) -> None: ...
+
+
 ToolResultCallback = Callable[[str], None]
 
 EMPTY_ANSWER = "No pude generar una respuesta. Probá reformular la pregunta."
-DEFAULT_PROVIDER = "local"
+DEFAULT_PROVIDER: Final = "local"
 _MAX_DETAIL_CHARS = 200
 
 
@@ -29,7 +34,7 @@ class UnknownProvider(Exception):
     """Se pidió un proveedor de LLM que no está configurado."""
 
 
-def _detail(arguments: dict) -> str | None:
+def _detail(arguments: dict[str, Any]) -> str | None:
     text = next((value for value in arguments.values() if isinstance(value, str) and value.strip()), None)
     return text.strip()[:_MAX_DETAIL_CHARS] if text else None
 

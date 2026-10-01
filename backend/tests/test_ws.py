@@ -19,7 +19,7 @@ def _echo_users(messages) -> LLMResponse:
 
 
 def _client(llm=None, tools=None, **settings_overrides) -> TestClient:
-    settings = Settings(_env_file=None, cors_origins=[ORIGIN], **settings_overrides)
+    settings = Settings(_env_file=None, cors_origins=[ORIGIN], **settings_overrides)  # type: ignore[call-arg]
     app = FastAPI()
     app.include_router(ws.router)
     app.state.settings = settings
@@ -50,16 +50,14 @@ def test_flujo_completo_estados_y_respuesta():
 
 
 def test_criterio_9_origin_ajeno_cierra_1008():
-    with _connect(_client(), origin="https://evil.example") as socket:
-        with pytest.raises(WebSocketDisconnect) as excinfo:
-            socket.receive_json()
+    with _connect(_client(), origin="https://evil.example") as socket, pytest.raises(WebSocketDisconnect) as excinfo:
+        socket.receive_json()
     assert excinfo.value.code == 1008
 
 
 def test_sin_origin_cierra_1008():
-    with _client().websocket_connect("/ws/chat") as socket:
-        with pytest.raises(WebSocketDisconnect) as excinfo:
-            socket.receive_json()
+    with _client().websocket_connect("/ws/chat") as socket, pytest.raises(WebSocketDisconnect) as excinfo:
+        socket.receive_json()
     assert excinfo.value.code == 1008
 
 
@@ -127,14 +125,13 @@ def test_rate_limit_por_conexion():
 
 def test_limite_de_conexiones_por_ip():
     client = _client(ws_max_connections_per_ip=1)
-    with _connect(client), _connect(client) as second:
-        with pytest.raises(WebSocketDisconnect) as excinfo:
-            second.receive_json()
+    with _connect(client), _connect(client) as second, pytest.raises(WebSocketDisconnect) as excinfo:
+        second.receive_json()
     assert excinfo.value.code == 1013
 
 
 def test_sanitiza_control_y_normaliza_nfc():
-    assert ws.sanitize_text("  Café\x00‮ ok\n ") == "Café ok"
+    assert ws.sanitize_text("  Café\x00‮ ok\n ") == "Café ok"  # noqa: PLE2502 - el caracter bidi es el caso bajo prueba
 
 
 def test_provider_cloud_responde_con_su_modelo_y_comparte_historial():

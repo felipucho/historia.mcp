@@ -37,6 +37,10 @@ export default function Reader({ docs, error }) {
             </article>
           ))}
         </div>
+
+        <footer className="mt-16 border-t border-white/10 pt-6 text-xs text-slate-500">
+          © {new Date().getFullYear()} Las Varillas Digital · Archivo histórico
+        </footer>
       </div>
     </main>
   )

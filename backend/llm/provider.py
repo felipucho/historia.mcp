@@ -7,7 +7,6 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-
 # Recibe cada pedazo de texto de la respuesta a medida que el modelo lo genera.
 DeltaCallback = Callable[[str], Awaitable[None]]
 
@@ -52,7 +51,15 @@ class LLMError(Exception):
 
 
 class LLMUnavailable(LLMError):
-    """Proveedor inalcanzable o modelo ausente. El mensaje es apto para el usuario."""
+    """Proveedor inalcanzable o modelo ausente.
+
+    public=True: el mensaje es apto para mostrar tal cual (sin URLs internas). Cada proveedor lo decide,
+    así la API no necesita saber qué proveedor falló.
+    """
+
+    def __init__(self, message: str, *, public: bool = False) -> None:
+        super().__init__(message)
+        self.public = public
 
 
 class LLMTimeout(LLMError):

@@ -9,13 +9,19 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
 
-from agents.historian import DEFAULT_PROVIDER, Conversation, HistorianAgent, MaxIterationsExceeded, UnknownProvider
+from agents.historian import (
+    DEFAULT_PROVIDER,
+    Conversation,
+    HistorianAgent,
+    MaxIterationsExceeded,
+    UnknownProvider,
+)
 from api.ratelimit import TokenBucket
 from config import Settings
 from llm.provider import LLMError, LLMTimeout, LLMUnavailable
 from logging_config import conn_id_var
 from store.history import rendered_ids
-from tools.registry import ToolsUnavailable
+from tools.base import ToolsUnavailable
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -24,7 +30,7 @@ MAX_TEXT_CHARS = 1000
 _MAX_FRAME_CHARS = 8 * MAX_TEXT_CHARS
 _WS_POLICY_VIOLATION = 1008
 _WS_TRY_AGAIN_LATER = 1013
-_BIDI_CONTROLS = dict.fromkeys(map(ord, "‪‫‬‭‮⁦⁧⁨⁩"))
+_BIDI_CONTROLS = dict.fromkeys(map(ord, "‪‫‬‭‮⁦⁧⁨⁩"))  # noqa: PLE2502 - la lista de overrides bidi es el punto
 
 ErrorCode = Literal[
     "llm_unavailable", "llm_timeout", "tools_unavailable", "busy",
@@ -143,13 +149,8 @@ async def _run_turn(
         event = ErrorEvent(code="llm_timeout", message="El modelo tardó demasiado en responder. Probá de nuevo.")
     except LLMUnavailable as exc:
         logger.error("turn_llm_unavailable", extra={"error": str(exc), "provider": provider})
-        # Los mensajes del cliente en la nube son aptos para el usuario (key faltante, límite gratuito).
-        # Los de Ollama llevan URLs internas: se reemplazan por uno genérico.
-        message = (
-            "El modelo de lenguaje no está disponible. Verificá que Ollama esté corriendo."
-            if provider == "local"
-            else f"{exc}. Probá con el modelo local."
-        )
+        # Cada proveedor marca si su mensaje es apto para el usuario; los de Ollama llevan URLs internas.
+        message = f"{exc}. Probá con el modelo local." if exc.public else "El modelo de lenguaje no está disponible. Verificá que Ollama esté corriendo."
         event = ErrorEvent(code="llm_unavailable", message=message)
     except MaxIterationsExceeded:
         event = ErrorEvent(code="max_iterations", message="No llegué a una respuesta final. Probá reformular la pregunta.")

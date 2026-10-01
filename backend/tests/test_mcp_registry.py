@@ -1,14 +1,17 @@
 """McpToolRegistry contra el servidor MCP real en memoria (sin subproceso) y contra un proceso que muere."""
 
 import sys
+from typing import cast
 
 import pytest
 from mcp import Client, StdioServerParameters
+from mcp.types import RequestParamsMeta, TextContent
 
 from mcp_meta import USER_QUESTION_META
 from mcp_server import build_server
 from tests.conftest import TOOL_NAME
-from tools.registry import McpToolRegistry, ToolError, ToolsUnavailable
+from tools.base import ToolError, ToolsUnavailable
+from tools.registry import McpToolRegistry
 
 
 def _registry(server, **overrides) -> McpToolRegistry:
@@ -74,9 +77,10 @@ async def test_preguntas_validas_no_generan_aviso(store, tema, question):
 
 async def test_meta_invalido_se_ignora_sin_romper_la_tool(store):
     async with Client(build_server(store)) as client:
-        result = await client.call_tool(TOOL_NAME, {"tema": "Lorenzo Dabbene"}, meta={USER_QUESTION_META: {"x": 1}})
+        result = await client.call_tool(TOOL_NAME, {"tema": "Lorenzo Dabbene"}, meta=cast(RequestParamsMeta, {USER_QUESTION_META: {"x": 1}}))
     [block] = result.content
     assert not result.is_error
+    assert isinstance(block, TextContent)
     assert block.text.startswith("AVISO: «Lorenzo» no aparece")  # cae al tema, como sin _meta
 
 

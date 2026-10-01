@@ -82,6 +82,10 @@ Para agregar una herramienta alcanza con declararla en `mcp_server.py`: `McpTool
 - **Streaming: `chat_stream` convive con `chat`.** El agente usa `chat_stream` solo si le pasan `on_delta` (el WS siempre; evals y tests no). La implementación por defecto en `LLMProvider` llama a `chat` y emite todo junto, por eso `FakeLLM` no necesita cambios. El WS manda `DeltaEvent` por pedazo y el `ResponseEvent` final con el texto completo sigue siendo la fuente de verdad. Si el modelo escribe algo antes de pedir una tool, el frontend lo borra al recibir el estado `tool_call`.
 - **Ollama retiene el texto que arranca con `{` o `` ` ``** hasta terminar: puede ser una tool call escrita como JSON (`_parse_text_tool_call`) y no debe aparecer en el chat.
 - **El frontend renderiza markdown mínimo** (`AnswerText` en `ChatDrawer.jsx`: negrita, cursiva, títulos) armando nodos de React, nunca HTML. También borra las marcas `【id】` que mete gpt-oss: las citas ya son botones.
+- **Sin `fundacion.json` el backend no arranca (fail-fast), no hay 404 en `/api/fundacion`.** `lifespan` propaga `HistoryStoreError`; un corpus ausente no tiene arreglo en runtime y un 404 ocultaría la config rota. El servidor MCP también sale con `exit(1)` en ese caso (`mcp_server.main`); el backend lo trata como MCP caído y responde `tools_unavailable`.
+- **El frontend se aparta del plan del taller:** `fetch` nativo en vez de Axios (dos GET simples, soporta `AbortController`); Tailwind 4 con `@tailwindcss/vite` — sin `tailwind.config.js`, PostCSS ni Autoprefixer (la v4 detecta clases y prefija sola); fuentes del sistema en vez de Google Fonts (evita request a terceros); reconexión del WebSocket con backoff exponencial y jitter en vez de 3 s fijos (`services/ws.js`); `thin-scrollbar` en vez de `.custom-scrollbar`.
+- **No se usa `python-multipart`:** no hay formularios ni uploads.
+- **El servidor MCP usa `MCPServer` (API de alto nivel del SDK 2.x, sucesora de FastMCP), no el SDK de bajo nivel.**
 
 ### Configuración
 

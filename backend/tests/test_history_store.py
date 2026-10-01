@@ -3,7 +3,14 @@ import json
 
 import pytest
 
-from store.history import HistoryStore, HistoryStoreError, render_documents, render_index, rendered_ids, tokenize
+from store.history import (
+    HistoryStore,
+    HistoryStoreError,
+    render_documents,
+    render_index,
+    rendered_ids,
+    tokenize,
+)
 
 
 def _write(tmp_path, content: bytes | str):
@@ -71,6 +78,15 @@ def test_pregunta_general_devuelve_corpus_sin_terminos_faltantes(store, tema):
     # Regresión: 'historia' no está en el corpus y devolvía 0 documentos + aviso «historia».
     result = store.search(tema)
     assert (len(result.documents), result.unmatched_terms) == (3, [])
+
+
+@pytest.mark.parametrize(
+    ("pregunta", "generico"),
+    [("quién defiende esa fecha", "fecha"), ("en qué año fue", "ano")],
+)
+def test_fecha_y_ano_son_terminos_genericos_y_no_generan_aviso(store, pregunta, generico):
+    # Regresión: «fecha» y «año» son palabras de la consulta, no nombres que falten en el corpus.
+    assert generico not in store.search(pregunta).unmatched_terms
 
 
 def test_termino_presente_en_todos_solo_puntua_sin_terminos_especificos(store):
