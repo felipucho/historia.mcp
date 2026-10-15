@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 # SOLID-S (responsabilidad única): traduce el contrato LLMProvider a /chat/completions.
 # No decide nada del agente: arma el payload y parsea la respuesta.
+# SOLID-L (sustitución de Liskov): OpenAICompatClient cumple LLMProvider con las mismas firmas.
+# Lanza los mismos tipos de error (LLMError y subclases): el agente no distingue el proveedor.
 class OpenAICompatClient(LLMProvider):
     def __init__(
         self,
