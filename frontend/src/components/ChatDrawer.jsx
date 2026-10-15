@@ -23,6 +23,8 @@ function ModelToggle({ models, provider, onChange, disabled }) {
   return (
     <div role="radiogroup" aria-label="Modelo de lenguaje" className="flex rounded-xl border border-white/10 bg-slate-900 p-1">
       {models.map((model) => {
+        // SOLID-O (abierto/cerrado): el selector busca nombre e ícono en PROVIDERS.
+        // Un proveedor nuevo aparece en el selector sin tocar este componente.
         const meta = PROVIDERS[model.id]
         if (!meta) return null
         const Icon = meta.icon
