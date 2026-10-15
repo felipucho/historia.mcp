@@ -1,3 +1,5 @@
+// SOLID-S (responsabilidad única): solo muestra los documentos o el error de carga.
+// Recibe docs y error por props: no pide datos ni navega.
 export default function Reader({ docs, error }) {
   return (
     <main className="thin-scrollbar flex-1 overflow-y-auto px-6 py-12 md:px-12 md:py-20">
