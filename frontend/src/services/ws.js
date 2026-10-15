@@ -1,3 +1,5 @@
+// SOLID-S (responsabilidad única): protocolo del WebSocket (URL, eventos y backoff).
+// No usa React: useWebSocket decide cuándo conectar; este módulo define cómo se habla.
 export const CLOSE_POLICY_VIOLATION = 1008
 
 const EVENT_TYPES = new Set(['status', 'delta', 'response', 'error'])
