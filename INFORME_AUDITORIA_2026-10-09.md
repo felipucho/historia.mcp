@@ -1,6 +1,6 @@
 # Auditoría historia.mcp, corrida del 2026-10-09
 
-Alcance: `backend/` y `frontend/`. El legacy de la raíz no se evaluó. La auditoría no modificó código; después se aplicó la refactorización de la sección 10. El informe previo del 2026-10-01 (`INFORME_AUDITORIA.md`) no se tocó; esta corrida lo reemplaza para la exposición.
+Alcance: `backend/` y `frontend/`. El legacy de la raíz no se evaluó. La auditoría no modificó código; después se aplicó la refactorización de la sección 10. El informe previo del 2026-10-01 (`INFORME_AUDITORIA.md`) no se tocó; esta corrida lo reemplaza para la exposición. Los números de línea citados en las secciones 2 a 9 corresponden al código auditado (commit `0345084`); los de las secciones 10 y 11, al commit `ad09251`. La rama `solid-comentarios` agrega comentarios y corre esas líneas, sin cambiar código.
 
 ## 1. Resumen
 
@@ -283,4 +283,14 @@ Se aplicó la refactorización pedida: los puntos de SOLID con puntaje más bajo
 **Pendiente:**
 - Proveedor Nube (Groq) en vivo: requiere autorización, porque envía la pregunta a Groq.
 - Captura visual del chat con las respuestas renderizadas: el panel del navegador no se mostró. El render de `AnswerText` está cubierto por pruebas del parser y por el build, no por una captura.
-- Cambios sin commit: no se pidió commit.
+- Refactorización commiteada en `ad09251`; auditoría rehecha en `f9e3b3b`.
+
+## 12. Comentarios SOLID en el código (rama `solid-comentarios`)
+
+Para la exposición, cada lugar donde se aplica un principio lleva un comentario con el marcador `SOLID-S`, `SOLID-O`, `SOLID-L`, `SOLID-I` o `SOLID-D`. Para listarlos: `git grep -n "SOLID-"`.
+
+- Un commit por archivo y principio: 48 commits (S 23, O 10, L 6, I 2, D 7). Cada mensaje dice qué principio se aplica, qué dice el principio y el comentario agregado.
+- Solo comentarios: 102 líneas agregadas, 0 borradas, 34 archivos. En cada commit de Python el AST queda igual.
+- Verificación: `pytest` 136, `mypy`, `ruff`, `npm --prefix frontend test` 17, lint y build.
+- Sin marcador, por estar parciales o no aplicados: H7 (cadena de `except`), H9 (transporte con clases concretas), el `switch` del reducer y `Bubble` (OCP parcial).
+- Precisión sobre B5: `main.py` es la raíz de composición del backend, pero no el único lugar que instancia clases concretas: `mcp_server.py` y `evals/eval_agent.py` también crean `HistoryStore`.
