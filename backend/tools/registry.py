@@ -34,6 +34,8 @@ async def _fetch_tools(client: Client) -> dict[str, ToolSpec]:
 
 # SOLID-S (responsabilidad única): descubre las tools y las ejecuta.
 # La conexión y los reintentos no están aquí: los maneja McpSupervisor.
+# SOLID-L (sustitución de Liskov): McpToolRegistry cumple ToolRegistry (specs y call).
+# El agente la usa igual que a FakeTools en los tests.
 class McpToolRegistry(ToolRegistry):
     """Descubre y ejecuta las tools del servidor MCP. La conexión y los reintentos los maneja McpSupervisor."""
 
