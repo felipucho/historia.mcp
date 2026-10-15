@@ -1,7 +1,9 @@
-import { BookOpen, Cloud, Cpu, Loader2, Send, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { BookOpen, Loader2, Send, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
-import { MAX_TEXT_CHARS } from '../services/ws.js'
+import { PROVIDERS } from '../config/providers.js'
+import { MAX_TEXT_CHARS } from '../constants.js'
+import AnswerText from './AnswerText.jsx'
 
 const AGENT_LABEL = {
   sending: 'Enviando…',
@@ -16,39 +18,11 @@ const CONNECTION = {
   rejected: { label: 'Conexión rechazada por el servidor', dot: 'bg-red-500' },
 }
 
-const PROVIDER = {
-  local: { label: 'Local', icon: Cpu, badge: 'text-emerald-300 border-emerald-400/30' },
-  cloud: { label: 'Nube', icon: Cloud, badge: 'text-sky-300 border-sky-400/30' },
-}
-
-// Marcas de cita que algunos modelos meten en el texto (【debates_origen_01】). Las citas ya van como botones.
-// El `$` borra también una marca a medio llegar durante el stream.
-const CITATION_MARK = /【[^】]*(】|$)/g
-const HEADING = /^#{1,6}\s+(.*)$/gm
-// **negrita** o *cursiva*. El grupo de captura hace que split deje los fragmentos marcados en índices impares.
-const EMPHASIS = /(\*\*[^*]+?\*\*|\*[^*\s][^*]*?\*)/g
-
-/** Markdown mínimo: negrita, cursiva y títulos. Arma nodos de React, nunca HTML: la salida del LLM no es confiable. */
-function AnswerText({ text }) {
-  const clean = text.replace(CITATION_MARK, '').replace(HEADING, '**$1**')
-  return clean.split(EMPHASIS).map((part, index) => {
-    if (index % 2 === 0) return part
-    if (part.startsWith('**')) {
-      return (
-        <strong key={index} className="font-semibold text-white">
-          {part.slice(2, -2)}
-        </strong>
-      )
-    }
-    return <em key={index}>{part.slice(1, -1)}</em>
-  })
-}
-
 function ModelToggle({ models, provider, onChange, disabled }) {
   return (
     <div role="radiogroup" aria-label="Modelo de lenguaje" className="flex rounded-xl border border-white/10 bg-slate-900 p-1">
       {models.map((model) => {
-        const meta = PROVIDER[model.id]
+        const meta = PROVIDERS[model.id]
         if (!meta) return null
         const Icon = meta.icon
         const active = model.id === provider
@@ -106,7 +80,7 @@ function Bubble({ message, docsById, onOpenSource }) {
     )
   }
   const isError = message.role === 'error'
-  const provider = PROVIDER[message.provider]
+  const provider = PROVIDERS[message.provider]
   return (
     <div className="flex flex-col items-start">
       {provider && (
@@ -132,24 +106,9 @@ function Bubble({ message, docsById, onOpenSource }) {
   )
 }
 
-export default function ChatDrawer({
-  open,
-  onClose,
-  messages,
-  pending,
-  agentState,
-  tool,
-  detail,
-  streaming,
-  streamingProvider,
-  connection,
-  onSend,
-  models,
-  provider,
-  onProviderChange,
-  docsById,
-  onOpenSource,
-}) {
+export default function ChatDrawer({ open, chat, connection, models, provider, docsById, actions }) {
+  const { messages, pending, agentState, tool, detail, streaming, streamingProvider } = chat
+  const { onClose, onSend, onProviderChange, onOpenSource } = actions
   const [draft, setDraft] = useState('')
   const endRef = useRef(null)
   const inputRef = useRef(null)

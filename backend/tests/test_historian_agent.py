@@ -1,12 +1,12 @@
 import pytest
-
 from agents.historian import EMPTY_ANSWER, HistorianAgent, MaxIterationsExceeded
 from agents.prompt import build_system_prompt
 from config import ROOT_DIR
 from llm.provider import LLMResponse, LLMUnavailable, ToolCall
-from store.history import render_documents, render_index
-from tests.conftest import TOOL_NAME, FakeLLM, FakeTools
+from store.render import render_documents, render_index
 from tools.base import ToolError, ToolsUnavailable
+
+from tests.conftest import TOOL_NAME, FakeLLM, FakeTools
 
 
 class _Statuses(list):

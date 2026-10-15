@@ -4,75 +4,15 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import ChatDrawer from './components/ChatDrawer.jsx'
 import Reader from './components/Reader.jsx'
 import Sidebar from './components/Sidebar.jsx'
+import { DEFAULT_PROVIDER, FALLBACK_MODELS } from './config/providers.js'
+import { MOBILE_QUERY } from './constants.js'
+import { useDocNavigation } from './hooks/useDocNavigation.js'
 import { useWebSocket } from './hooks/useWebSocket.js'
 import { fetchFundacion, fetchModelos } from './services/api.js'
 import { chatSocketUrl } from './services/ws.js'
+import { chatReducer, initialChat } from './state/chatReducer.js'
 
 const SOCKET_URL = chatSocketUrl()
-const MOBILE_QUERY = '(max-width: 767px)'
-
-const initialChat = {
-  messages: [{ id: 0, role: 'assistant', content: 'Hola, soy el asistente historiador de Las Varillas. Preguntame sobre su fundación.' }],
-  pending: false,
-  agentState: 'idle',
-  tool: null,
-  detail: null,
-  // Texto que el modelo va generando en el turno en curso; el evento response lo reemplaza por el final.
-  streaming: '',
-  streamingProvider: null,
-}
-
-// Si /api/modelos falla, el selector igual ofrece el local: es el único que no depende de configuración.
-const FALLBACK_MODELS = [{ id: 'local', nombre: 'Local', disponible: true }]
-
-// Lista append-only: el índice sirve de id estable y el reducer queda puro.
-const append = (chat, role, content, extra) => [...chat.messages, { id: chat.messages.length, role, content, ...extra }]
-const settle = { pending: false, agentState: 'idle', tool: null, detail: null, streaming: '' }
-
-function chatReducer(chat, action) {
-  switch (action.type) {
-    case 'sent':
-      return {
-        ...chat,
-        messages: append(chat, 'user', action.text),
-        pending: true,
-        agentState: 'sending',
-        tool: null,
-        detail: null,
-        streaming: '',
-        streamingProvider: action.provider,
-      }
-    case 'status':
-      if (action.state === 'idle') return chat
-      // tool_call: lo escrito antes era un preámbulo del modelo, no la respuesta.
-      return {
-        ...chat,
-        agentState: action.state,
-        tool: action.tool ?? null,
-        detail: action.detail ?? null,
-        streaming: action.state === 'tool_call' ? '' : chat.streaming,
-      }
-    case 'delta':
-      return chat.pending ? { ...chat, streaming: chat.streaming + action.content } : chat
-    case 'response':
-      return {
-        ...chat,
-        ...settle,
-        messages: append(chat, 'assistant', action.content, { provider: action.provider, sources: action.sources ?? [] }),
-      }
-    case 'error':
-      // busy: el turno anterior sigue en curso, el indicador no se corta.
-      return action.code === 'busy'
-        ? { ...chat, messages: append(chat, 'error', action.message) }
-        : { ...chat, ...settle, messages: append(chat, 'error', action.message) }
-    case 'closed':
-      return chat.pending ? { ...chat, ...settle, messages: append(chat, 'error', 'Se perdió la conexión con el servidor. Reintentando…') } : chat
-    case 'offline':
-      return { ...chat, messages: append(chat, 'error', 'Sin conexión con el servidor. Esperá a que se reconecte.') }
-    default:
-      return chat
-  }
-}
 
 export default function App() {
   const [docs, setDocs] = useState([])
@@ -81,7 +21,7 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(false)
   const [chat, dispatch] = useReducer(chatReducer, initialChat)
   const [models, setModels] = useState(FALLBACK_MODELS)
-  const [provider, setProvider] = useState('local')
+  const [provider, setProvider] = useState(DEFAULT_PROVIDER)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -121,14 +61,7 @@ export default function App() {
     [send, provider],
   )
 
-  const navigate = useCallback((id) => {
-    const target = document.getElementById(id)
-    if (!target) return
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
-    target.focus({ preventScroll: true })
-    if (window.matchMedia(MOBILE_QUERY).matches) setSidebarOpen(false)
-  }, [])
+  const navigate = useDocNavigation(setSidebarOpen)
 
   const closeChat = useCallback(() => setChatOpen(false), [])
 
@@ -139,6 +72,12 @@ export default function App() {
       navigate(id)
     },
     [navigate],
+  )
+
+  // Callbacks del drawer agrupados. El objeto es estable: cada función ya lo es.
+  const chatActions = useMemo(
+    () => ({ onClose: closeChat, onSend: handleSend, onProviderChange: setProvider, onOpenSource: openSource }),
+    [closeChat, handleSend, openSource],
   )
 
   return (
@@ -180,21 +119,12 @@ export default function App() {
 
       <ChatDrawer
         open={chatOpen}
-        onClose={closeChat}
-        messages={chat.messages}
-        pending={chat.pending}
-        agentState={chat.agentState}
-        tool={chat.tool}
-        detail={chat.detail}
-        streaming={chat.streaming}
-        streamingProvider={chat.streamingProvider}
+        chat={chat}
         connection={connection}
-        onSend={handleSend}
         models={models}
         provider={provider}
-        onProviderChange={setProvider}
         docsById={docsById}
-        onOpenSource={openSource}
+        actions={chatActions}
       />
     </div>
   )

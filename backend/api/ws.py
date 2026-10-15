@@ -6,9 +6,6 @@ import unicodedata
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
-
 from agents.historian import (
     DEFAULT_PROVIDER,
     Conversation,
@@ -16,12 +13,16 @@ from agents.historian import (
     MaxIterationsExceeded,
     UnknownProvider,
 )
-from api.ratelimit import TokenBucket
 from config import Settings
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from llm.catalog import ProviderId
 from llm.provider import LLMError, LLMTimeout, LLMUnavailable
 from logging_config import conn_id_var
-from store.history import rendered_ids
+from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
+from store.render import rendered_ids
 from tools.base import ToolsUnavailable
+
+from api.ratelimit import TokenBucket
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -36,7 +37,6 @@ ErrorCode = Literal[
     "llm_unavailable", "llm_timeout", "tools_unavailable", "busy",
     "rate_limited", "invalid_input", "max_iterations", "internal", "provider_unavailable",
 ]
-Provider = Literal["local", "cloud"]
 
 
 def sanitize_text(value: str) -> str:
@@ -56,7 +56,7 @@ class ChatIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     text: Annotated[str, AfterValidator(sanitize_text)]
-    provider: Provider = DEFAULT_PROVIDER
+    provider: ProviderId = DEFAULT_PROVIDER
 
 
 class StatusEvent(BaseModel):
@@ -80,7 +80,7 @@ class ResponseEvent(BaseModel):
 
     type: Literal["response"] = "response"
     content: str
-    provider: Provider
+    provider: ProviderId
     # IDs de los documentos que devolvió la tool en este turno: el frontend los muestra como citas.
     sources: list[str] | None = None
 
@@ -121,7 +121,7 @@ def _parse(text: str | None) -> ChatIn:
 
 
 async def _run_turn(
-    channel: _Channel, agent: HistorianAgent, conversation: Conversation, text: str, provider: Provider
+    channel: _Channel, agent: HistorianAgent, conversation: Conversation, text: str, provider: ProviderId
 ) -> None:
     async def on_status(state: Literal["thinking", "tool_call"], tool: str | None, detail: str | None = None) -> None:
         await channel.send(StatusEvent(state=state, tool=tool, detail=detail))

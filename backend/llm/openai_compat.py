@@ -20,10 +20,9 @@ from llm.provider import (
     LLMTimeout,
     LLMUnavailable,
     Message,
-    ToolCall,
     ToolSpec,
-    new_tool_call_id,
 )
+from llm.wire import tool_call_from_wire
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class OpenAICompatClient(LLMProvider):
         if not isinstance(message, dict):
             raise LLMError("Respuesta del modelo en la nube sin 'choices[0].message'")
         raw_calls = message.get("tool_calls") or []
-        return LLMResponse(content=message.get("content") or "", tool_calls=[self._from_wire(raw) for raw in raw_calls])
+        return LLMResponse(content=message.get("content") or "", tool_calls=[tool_call_from_wire(raw) for raw in raw_calls])
 
     async def chat_stream(self, messages: Sequence[Message], tools: Sequence[ToolSpec], on_delta: DeltaCallback) -> LLMResponse:
         """SSE: cada 'data:' trae un delta. Las tool calls llegan en fragmentos por 'index' y se arman al final."""
@@ -81,10 +80,13 @@ class OpenAICompatClient(LLMProvider):
                         await on_delta(text)
                     for raw in delta.get("tool_calls") or []:
                         self._merge_call_fragment(calls, raw)
-        return LLMResponse(content="".join(parts), tool_calls=[self._from_wire(calls[index]) for index in sorted(calls)])
+        return LLMResponse(content="".join(parts), tool_calls=[tool_call_from_wire(calls[index]) for index in sorted(calls)])
 
     async def health(self) -> None:
-        # Sin request de red: el free tier cuenta cada llamada. La key se valida en el primer mensaje.
+        """Chequeo de configuración: solo valida la key. Sin request de red, porque el free tier cuenta cada llamada.
+
+        La conectividad se descubre en el primer mensaje, con los errores de _errors().
+        """
         self._require_key()
 
     async def aclose(self) -> None:
@@ -186,18 +188,3 @@ class OpenAICompatClient(LLMProvider):
         if message.role == "tool":
             wire["tool_call_id"] = message.tool_call_id
         return wire
-
-    @staticmethod
-    def _from_wire(raw: Any) -> ToolCall:
-        function = raw.get("function") if isinstance(raw, dict) else None
-        if not isinstance(function, dict) or not isinstance(function.get("name"), str) or not function["name"]:
-            raise InvalidToolCall(f"tool_call sin function.name: {raw!r:.200}")
-        arguments = function.get("arguments") or "{}"
-        if isinstance(arguments, str):
-            try:
-                arguments = json.loads(arguments)
-            except json.JSONDecodeError as exc:
-                raise InvalidToolCall(f"arguments no es JSON en {function['name']}") from exc
-        if not isinstance(arguments, dict):
-            raise InvalidToolCall(f"arguments no es un objeto en {function['name']}")
-        return ToolCall(id=raw.get("id") or new_tool_call_id(), name=function["name"], arguments=arguments)

@@ -1,4 +1,4 @@
-"""Contrato de _meta entre el cliente MCP (tools.registry) y el servidor (mcp_server).
+"""Contratos compartidos por el cliente MCP, el servidor y el prompt.
 
 Módulo sin dependencias: el subproceso MCP no debe importar código del lado cliente.
 """
@@ -9,3 +9,7 @@ USER_QUESTION_META = "historia-varillas/user_question"
 
 # Mismo tope que el WebSocket. El servidor lo aplica igual: cualquier cliente MCP puede mandar _meta.
 USER_QUESTION_MAX_CHARS = 1000
+
+# Prefijo del texto que devuelve la tool cuando falta un término. La regla 5 del prompt lo nombra:
+# si cambia aquí, cambia también la regla.
+AVISO_PREFIJO = "AVISO"

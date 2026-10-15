@@ -2,7 +2,6 @@ import asyncio
 from collections.abc import Callable, Sequence
 
 import pytest
-
 from config import ROOT_DIR
 from llm.provider import LLMProvider, LLMResponse, Message, ToolSpec
 from store.history import HistoryStore

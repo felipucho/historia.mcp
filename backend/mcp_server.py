@@ -9,20 +9,13 @@ import re
 import sys
 from typing import Annotated
 
-from mcp.server.mcpserver import Context, MCPServer
-from pydantic import Field
-
 from config import Settings
 from logging_config import setup_logging
-from mcp_meta import USER_QUESTION_MAX_CHARS, USER_QUESTION_META
-from store.history import (
-    HistoryStore,
-    HistoryStoreError,
-    normalize,
-    render_documents,
-    render_index,
-    tokenize,
-)
+from mcp.server.mcpserver import Context, MCPServer
+from mcp_meta import AVISO_PREFIJO, USER_QUESTION_MAX_CHARS, USER_QUESTION_META
+from pydantic import Field
+from store.history import HistoryStore, HistoryStoreError, normalize, tokenize
+from store.render import render_documents, render_index
 
 logger = logging.getLogger("mcp_server")
 
@@ -91,7 +84,7 @@ def build_server(store: HistoryStore) -> MCPServer:
         if missing:
             words = ", ".join(f"«{word}»" for word in missing)
             warning = (
-                f"AVISO: {words} no aparece en ningún documento. Empezá tu respuesta con: "
+                f"{AVISO_PREFIJO}: {words} no aparece en ningún documento. Empezá tu respuesta con: "
                 f"\"No hay registros de {words} en los documentos.\" Después usá solo los datos de abajo, con los "
                 "nombres exactamente como figuran, sin agregar profesiones, nacionalidades ni parentescos.\n\n"
             )

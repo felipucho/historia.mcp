@@ -2,15 +2,8 @@ import codecs
 import json
 
 import pytest
-
-from store.history import (
-    HistoryStore,
-    HistoryStoreError,
-    render_documents,
-    render_index,
-    rendered_ids,
-    tokenize,
-)
+from store.history import HistoryStore, HistoryStoreError, tokenize
+from store.render import render_documents, render_index, rendered_ids
 
 
 def _write(tmp_path, content: bytes | str):

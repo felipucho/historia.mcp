@@ -29,6 +29,7 @@ npm --prefix frontend install
 npm --prefix frontend run dev       # vite en 5173, strictPort
 npm --prefix frontend run lint      # oxlint
 npm --prefix frontend run build
+npm --prefix frontend test          # node --test: reducer y parser de markdown, sin dependencias de prueba
 ```
 
 `.claude/launch.json` ya define los dos servidores (`backend`, `frontend`) para `preview_start`; usalo en vez de levantarlos por Bash.
@@ -54,8 +55,9 @@ navegador  --WS /ws/chat-->  api/ws.py  -->  HistorianAgent.run  -->  OllamaClie
 
 - `store/history.py` — carga y valida `fundacion.json`, busca por tokens. No sabe de MCP, LLM ni HTTP.
 - `llm/provider.py` — contrato abstracto (`LLMProvider`, `Message`, `ToolSpec`, `ToolCall`). El agente solo ve estos tipos.
+- `llm/catalog.py` — `ProviderId`: la única lista de proveedores. `ChatIn`, `/api/modelos` y el agente salen de ahí.
 - `llm/ollama.py`, `llm/openai_compat.py` — traducen ese contrato al formato de cable de Ollama y de `/chat/completions`.
-- `tools/registry.py` — contrato `ToolRegistry` + implementación MCP.
+- `tools/registry.py` — contrato `ToolRegistry` + implementación MCP. `tools/mcp_supervisor.py` — conexión, backoff y cierre del cliente MCP.
 - `agents/historian.py` — loop de razonamiento con tools. No sabe de WebSocket ni de proveedor concreto.
 - `api/ws.py`, `api/rest.py` — transporte, validación y traducción de excepciones a eventos. Sin lógica de agente.
 
@@ -67,7 +69,7 @@ Para agregar una herramienta alcanza con declararla en `mcp_server.py`: `McpTool
 - **El agente nunca consulta al modelo sin tools.** `HistorianAgent.run` llama a `self._tools.specs()` antes del primer `chat`: un 3B sin datos inventa historia.
 - **La pregunta original viaja por `_meta`, no por los argumentos.** Contrato en `mcp_meta.py` (`USER_QUESTION_META`). Permite que `_missing_terms` detecte nombres que el modelo recortó ("Alvarez" por "Juan Alvarez") y emita el AVISO que dispara la regla 5 del prompt. `mcp_meta.py` no importa nada: el subproceso MCP no debe depender del lado cliente.
 - **`Conversation` guarda solo pares (pregunta, respuesta final).** Los resultados de tools se descartan: son la mayoría de los tokens y el modelo los vuelve a pedir. Así el system prompt nunca queda fuera de `num_ctx` ni quedan mensajes `role=tool` huérfanos.
-- **El cliente MCP vive en una tarea supervisora propia** (`McpToolRegistry._supervise`). Los task groups de anyio exigen abrir y cerrar el contexto en la *misma* tarea, y quien dispara la reconexión es otro handler.
+- **El cliente MCP vive en una tarea supervisora propia** (`McpSupervisor._supervise`, en `tools/mcp_supervisor.py`). Los task groups de anyio exigen abrir y cerrar el contexto en la *misma* tarea, y quien dispara la reconexión es otro handler.
 - **No existe `ping` en el protocolo MCP desde 2026-07-28.** El chequeo de vida es `tools/list` con `cache_mode="bypass"` y timeout de 3s; de paso refresca las tools.
 - **`temperature` por defecto 0.1.** Con el 0.8 de Ollama el modelo 3B inventa datos.
 - **Starlette no aplica CORS a WebSocket.** `chat_socket` valida el header `Origin` contra `CORS_ORIGINS` a mano y cierra con 1008 (CSWSH). Acepta antes de cerrar para que el cliente vea 1008 y no 1006.
@@ -75,9 +77,9 @@ Para agregar una herramienta alcanza con declararla en `mcp_server.py`: `McpTool
 - **`/api/fundacion` lee `HistoryStore` directo, sin MCP**, para que el lector funcione aunque el servidor MCP esté caído.
 - **Logs en JSON a stdout**, salvo en `mcp_server.py`: ahí stdout es el canal del protocolo, así que va a stderr. El `conn_id` viaja por contextvar.
 - **Los límites (`TokenBucket`, `ConnectionLimiter`) son en memoria**: válidos con un solo worker. Con varios hace falta un store compartido.
-- **El proveedor viaja en cada mensaje (`ChatIn.provider`), no en la conexión.** Cambiar de modelo no corta el WebSocket ni borra el historial: `Conversation` es por conexión y ambos modelos ven los mismos turnos. `HistorianAgent` recibe un dict `{nombre: LLMProvider}`; sin `GROQ_API_KEY` el `"cloud"` no se registra y el turno responde `provider_unavailable`. `GET /api/modelos` le dice al frontend cuál está disponible.
+- **El proveedor viaja en cada mensaje (`ChatIn.provider`), no en la conexión.** Cambiar de modelo no corta el WebSocket ni borra el historial: `Conversation` es por conexión y ambos modelos ven los mismos turnos. `HistorianAgent` recibe un dict `{ProviderId: LLMProvider}`; sin `GROQ_API_KEY` el `"cloud"` no se registra y el turno responde `provider_unavailable`. `GET /api/modelos` le dice al frontend cuál está disponible (la lista la arma `main.py` con `llm/catalog.py`).
 - **La key de Groq solo la ve el backend.** Vive en `.env`; el navegador habla con `/ws/chat` y nunca con Groq. `OpenAICompatClient.health()` no hace request: el free tier cuenta cada llamada.
-- **Las citas salen del texto de la tool, no del modelo.** `rendered_ids` (en `store/history.py`, junto a `render_documents`, que define el formato `[id] titulo`) extrae los IDs de cada resultado; `api/ws.py` los manda en `ResponseEvent.sources`. El índice de "sin resultados" usa `- ID: x |` y a propósito no cuenta como cita.
+- **Las citas salen del texto de la tool, no del modelo.** `rendered_ids` (en `store/render.py`, junto a `render_documents`, que define el formato `[id] titulo`) extrae los IDs de cada resultado; `api/ws.py` los manda en `ResponseEvent.sources`. El índice de "sin resultados" usa `- ID: x |` y a propósito no cuenta como cita.
 
 - **Streaming: `chat_stream` convive con `chat`.** El agente usa `chat_stream` solo si le pasan `on_delta` (el WS siempre; evals y tests no). La implementación por defecto en `LLMProvider` llama a `chat` y emite todo junto, por eso `FakeLLM` no necesita cambios. El WS manda `DeltaEvent` por pedazo y el `ResponseEvent` final con el texto completo sigue siendo la fuente de verdad. Si el modelo escribe algo antes de pedir una tool, el frontend lo borra al recibir el estado `tool_call`.
 - **Ollama retiene el texto que arranca con `{` o `` ` ``** hasta terminar: puede ser una tool call escrita como JSON (`_parse_text_tool_call`) y no debe aparecer en el chat.

@@ -11,21 +11,22 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
-from mcp import StdioServerParameters
-
 from agents.historian import HistorianAgent
 from agents.prompt import build_system_prompt
 from api import rest, ws
 from api.ratelimit import ConnectionLimiter
 from config import BACKEND_DIR, Settings
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from llm.catalog import ProviderId, catalogo_proveedores
 from llm.ollama import OllamaClient
 from llm.openai_compat import OpenAICompatClient
 from llm.provider import LLMError, LLMProvider
 from logging_config import setup_logging
-from store.history import HistoryStore, HistoryStoreError, render_index
+from mcp import StdioServerParameters
+from store.history import HistoryStore, HistoryStoreError
+from store.render import render_index
 from tools.base import ToolsUnavailable
 from tools.registry import McpToolRegistry
 
@@ -100,10 +101,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = settings
         app.state.store = store
         # Sin key el proveedor "cloud" no se registra: el agente responde provider_unavailable.
-        llms: dict[str, LLMProvider] = {"local": llm}
+        llms: dict[ProviderId, LLMProvider] = {ProviderId.LOCAL: llm}
         if settings.groq_api_key:
-            llms["cloud"] = cloud
+            llms[ProviderId.CLOUD] = cloud
             logger.info("cloud_llm_configured", extra={"model": settings.groq_model})
+        app.state.proveedores = catalogo_proveedores(
+            {ProviderId.LOCAL: f"Local · {settings.ollama_model}", ProviderId.CLOUD: f"Nube · {settings.groq_model}"},
+            registrados=llms,
+        )
         app.state.agent = HistorianAgent(
             llms,
             tools,
@@ -123,11 +128,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("shutdown_complete")
 
 
-WS_DESCRIPTION = """
+_PROVEEDORES_WS = " | ".join(f'"{provider.value}"' for provider in ProviderId)
+
+WS_DESCRIPTION = f"""
 ### WebSocket `/ws/chat`
 OpenAPI no describe WebSockets: el contrato está en los schemas `ChatIn`, `StatusEvent`, `DeltaEvent`, `ResponseEvent` y `ErrorEvent`.
 
-- Entrada: `ChatIn` → `{"text": "...", "provider": "local" | "cloud"}` (1 a 1000 caracteres; provider opcional, default `local`).
+- Entrada: `ChatIn` → `{{"text": "...", "provider": {_PROVEEDORES_WS}}}` (1 a 1000 caracteres; provider opcional, default `local`).
 - Salida: `StatusEvent` | `DeltaEvent` | `ResponseEvent` | `ErrorEvent`. Los `delta` llegan mientras el modelo escribe; el `response` final trae el texto completo.
 - Origin fuera de `CORS_ORIGINS` → cierre `1008`.
 """

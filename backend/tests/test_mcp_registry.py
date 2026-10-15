@@ -6,12 +6,12 @@ from typing import cast
 import pytest
 from mcp import Client, StdioServerParameters
 from mcp.types import RequestParamsMeta, TextContent
-
 from mcp_meta import USER_QUESTION_META
 from mcp_server import build_server
-from tests.conftest import TOOL_NAME
 from tools.base import ToolError, ToolsUnavailable
 from tools.registry import McpToolRegistry
+
+from tests.conftest import TOOL_NAME
 
 
 def _registry(server, **overrides) -> McpToolRegistry:

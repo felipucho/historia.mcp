@@ -19,8 +19,8 @@ from llm.provider import (
     Message,
     ToolCall,
     ToolSpec,
-    new_tool_call_id,
 )
+from llm.wire import tool_call_from_wire
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class OllamaClient(LLMProvider):
 
     def _finish(self, content: str, raw_calls: list[Any], tools: Sequence[ToolSpec]) -> LLMResponse:
         if raw_calls:
-            return LLMResponse(content=content, tool_calls=[self._from_wire(raw) for raw in raw_calls])
+            return LLMResponse(content=content, tool_calls=[tool_call_from_wire(raw) for raw in raw_calls])
         text_call = self._parse_text_tool_call(content, {spec.name for spec in tools})
         if text_call:
             return LLMResponse(tool_calls=[text_call])
@@ -182,21 +182,6 @@ class OllamaClient(LLMProvider):
             wire["tool_name"] = message.name
             wire["tool_call_id"] = message.tool_call_id
         return wire
-
-    @staticmethod
-    def _from_wire(raw: Any) -> ToolCall:
-        function = raw.get("function") if isinstance(raw, dict) else None
-        if not isinstance(function, dict) or not isinstance(function.get("name"), str):
-            raise InvalidToolCall(f"tool_call sin function.name: {raw!r:.200}")
-        arguments = function.get("arguments") or {}
-        if isinstance(arguments, str):
-            try:
-                arguments = json.loads(arguments)
-            except json.JSONDecodeError as exc:
-                raise InvalidToolCall(f"arguments no es JSON en {function['name']}") from exc
-        if not isinstance(arguments, dict):
-            raise InvalidToolCall(f"arguments no es un objeto en {function['name']}")
-        return ToolCall(id=raw.get("id") or new_tool_call_id(), name=function["name"], arguments=arguments)
 
     @staticmethod
     def _parse_text_tool_call(content: str, tool_names: set[str]) -> ToolCall | None:

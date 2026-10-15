@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from itertools import chain
 from typing import Any, Final, Literal, Protocol
 
+from llm.catalog import ProviderId
 from llm.provider import DeltaCallback, LLMProvider, Message
 from tools.base import ToolError, ToolRegistry
 
@@ -22,7 +23,7 @@ class StatusCallback(Protocol):
 ToolResultCallback = Callable[[str], None]
 
 EMPTY_ANSWER = "No pude generar una respuesta. Probá reformular la pregunta."
-DEFAULT_PROVIDER: Final = "local"
+DEFAULT_PROVIDER: Final = ProviderId.LOCAL
 _MAX_DETAIL_CHARS = 200
 
 
@@ -66,21 +67,21 @@ class HistorianAgent:
 
     def __init__(
         self,
-        llm: LLMProvider | Mapping[str, LLMProvider],
+        llm: LLMProvider | Mapping[ProviderId, LLMProvider],
         tools: ToolRegistry,
         system_prompt: str,
         *,
         max_iterations: int = 5,
         max_turns: int = 6,
     ) -> None:
-        self._llms = dict(llm) if isinstance(llm, Mapping) else {DEFAULT_PROVIDER: llm}
+        self._llms: dict[ProviderId, LLMProvider] = dict(llm) if isinstance(llm, Mapping) else {DEFAULT_PROVIDER: llm}
         self._tools = tools
         self._system_prompt = system_prompt
         self._max_iterations = max_iterations
         self._max_turns = max_turns
 
     @property
-    def providers(self) -> tuple[str, ...]:
+    def providers(self) -> tuple[ProviderId, ...]:
         return tuple(self._llms)
 
     def new_conversation(self) -> Conversation:
@@ -92,7 +93,7 @@ class HistorianAgent:
         text: str,
         on_status: StatusCallback,
         *,
-        provider: str = DEFAULT_PROVIDER,
+        provider: ProviderId = DEFAULT_PROVIDER,
         on_tool_result: ToolResultCallback | None = None,
         on_delta: DeltaCallback | None = None,
     ) -> str:

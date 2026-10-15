@@ -20,7 +20,8 @@ from config import Settings
 from llm.ollama import OllamaClient
 from llm.provider import ToolSpec
 from mcp_server import build_server
-from store.history import HistoryStore, render_index
+from store.history import HistoryStore
+from store.render import render_index
 from tools.base import ToolRegistry
 from tools.registry import McpToolRegistry
 

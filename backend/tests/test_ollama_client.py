@@ -2,7 +2,6 @@ import json
 
 import httpx
 import pytest
-
 from llm.ollama import OllamaClient
 from llm.provider import (
     InvalidToolCall,
@@ -12,6 +11,7 @@ from llm.provider import (
     Message,
     ToolCall,
 )
+
 from tests.conftest import TOOL_NAME, TOOL_SPEC
 
 

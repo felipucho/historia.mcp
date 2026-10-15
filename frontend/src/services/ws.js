@@ -1,4 +1,3 @@
-export const MAX_TEXT_CHARS = 1000
 export const CLOSE_POLICY_VIOLATION = 1008
 
 const EVENT_TYPES = new Set(['status', 'delta', 'response', 'error'])

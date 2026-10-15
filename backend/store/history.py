@@ -4,7 +4,7 @@ import codecs
 import functools
 import re
 import unicodedata
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,8 +44,6 @@ _GENERIC_TERMS = frozenset(
 )
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
-# Cabecera de cada documento en render_documents: "[id] titulo". Mismo patrón que Documento.id.
-_RENDERED_ID_RE = re.compile(r"^\[([A-Za-z0-9][A-Za-z0-9_-]*)\] ", re.MULTILINE)
 _NAME_RE = re.compile(r"\b[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñü]+)+")
 _MAX_NAME_WORDS = 3
 _FIELD_WEIGHTS = {"tags": 3, "titulo": 2, "contenido": 1}
@@ -194,27 +192,3 @@ class HistoryStore:
         if term.isalpha() and len(term) >= 5:
             return frozenset(token for token in self._vocabulary if token.isalpha() and _within_one_edit(term, token))
         return frozenset()
-
-
-def render_index(documents: Iterable[Documento]) -> str:
-    return "\n".join(
-        f"- ID: {doc.id} | {doc.titulo} | Fecha clave: {doc.metadata.fecha_clave} | Tags: {', '.join(doc.tags)}"
-        for doc in documents
-    )
-
-
-def render_documents(documents: Iterable[Documento]) -> str:
-    # Un dato por línea con etiqueta: el modelo cita "Fuente" y "Fecha clave" sin mezclarlos con el criterio.
-    return "\n\n---\n\n".join(
-        f"[{doc.id}] {doc.titulo}\n"
-        f"Fuente: {doc.metadata.fuente}\n"
-        f"Fecha clave: {doc.metadata.fecha_clave}\n"
-        f"Criterio: {doc.metadata.criterio_historiografico}\n"
-        f"Contenido: {doc.contenido}"
-        for doc in documents
-    )
-
-
-def rendered_ids(text: str) -> list[str]:
-    """IDs de los documentos presentes en un texto armado por render_documents, en orden y sin repetir."""
-    return list(dict.fromkeys(_RENDERED_ID_RE.findall(text)))

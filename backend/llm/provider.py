@@ -87,7 +87,7 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def health(self) -> None:
-        """Lanza LLMUnavailable si el proveedor no puede atender pedidos."""
+        """Lanza LLMUnavailable si el proveedor no puede atender pedidos. Puede limitarse a validar configuración (ej: la API key)."""
 
     async def warm_up(self) -> None:
         """Opcional: precarga el modelo."""

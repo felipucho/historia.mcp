@@ -1,14 +1,14 @@
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from starlette.websockets import WebSocketDisconnect
-
 from agents.historian import HistorianAgent
 from api import ws
 from api.ratelimit import ConnectionLimiter
 from config import Settings
-from llm.provider import LLMResponse, LLMUnavailable, ToolCall
-from store.history import render_documents, render_index
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from llm.provider import LLMError, LLMResponse, LLMTimeout, LLMUnavailable, ToolCall
+from starlette.websockets import WebSocketDisconnect
+from store.render import render_documents, render_index
+
 from tests.conftest import TOOL_NAME, FakeLLM, FakeTools
 
 ORIGIN = "http://localhost:5173"
@@ -201,3 +201,26 @@ def test_deltas_llegan_antes_de_la_respuesta_final():
         assert socket.receive_json() == {"type": "status", "state": "idle"}
     assert [e["content"] for e in events if e["type"] == "delta"] == ["Lle", "gó en ", "1900."]
     assert event["content"] == "Llegó en 1900."
+
+
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        (LLMUnavailable("caído"), "llm_unavailable"),
+        (LLMTimeout("lento"), "llm_timeout"),
+        (LLMError("respuesta rota"), "internal"),
+        (RuntimeError("bug"), "internal"),
+    ],
+)
+def test_cada_excepcion_del_turno_mapea_a_su_codigo(error, code):
+    # Fija el mapeo de _run_turn: LLMUnavailable y LLMTimeout deben ganar sobre LLMError (ver el orden de except).
+    with _connect(_client(llm=FakeLLM([error]))) as socket:
+        socket.send_json({"text": "hola"})
+        assert _until_final(socket)["code"] == code
+
+
+def test_max_iterations_mapea_a_su_codigo():
+    tool_call = LLMResponse(tool_calls=[ToolCall(name=TOOL_NAME, arguments={"tema": "x"})])
+    with _connect(_client(llm=FakeLLM(lambda messages: tool_call), tools=FakeTools({TOOL_NAME: "resultado"}))) as socket:
+        socket.send_json({"text": "hola"})
+        assert _until_final(socket)["code"] == "max_iterations"

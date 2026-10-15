@@ -36,15 +36,26 @@ Explicá en este orden, porque sigue el camino de un mensaje: datos (`fundacion.
 
 ## Desvíos intencionales conocidos (verificá que el equivalente exista, no los marques como "Falta")
 
-- Servidor MCP en `backend/mcp_server.py` con el SDK MCP 2.x de bajo nivel, sin `FastMCP`.
+Backend:
+- Servidor MCP en `backend/mcp_server.py` con `MCPServer`, la API de alto nivel del SDK `mcp==2.2.0` (sucesora de FastMCP). No usa `FastMCP` ni el SDK de bajo nivel.
 - La tool `consultar_fundacion_las_varillas` no tiene "modo índice" con `tema` vacío. El índice va en el system prompt (`render_index` dentro de `build_system_prompt`).
-- Cliente HTTP async en vez de `requests` sincrónico. Verificá que no haya llamadas bloqueantes dentro del event loop.
+- Cliente HTTP async `httpx==0.28.1` en vez de `requests` sincrónico. Verificá que no haya llamadas bloqueantes dentro del event loop.
 - CORS con orígenes explícitos (`CORS_ORIGINS`), no `"*"`. Validación manual de `Origin` en el WebSocket.
 - uvicorn en `127.0.0.1`, no `0.0.0.0`.
+- Sin `fundacion.json` el backend no arranca (fail-fast). No hay 404 en `/api/fundacion`. Evaluá A1.3 y A3.3 con esto.
+- Logs en JSON a stdout (`backend/logging_config.py`), no texto plano. En `mcp_server.py` los logs van a stderr porque stdout es el canal del protocolo.
 - `Conversation` guarda solo pares (pregunta, respuesta final), no los mensajes `role=tool`.
 - Proveedor por mensaje (`ChatIn.provider`): local (Ollama) o nube (Groq). El plan solo pide Ollama.
 - Streaming con `DeltaEvent`, además del `ResponseEvent` final.
 - Configuración por `.env` y `backend/config.py`, en vez de constantes en `main.py`.
+- No se usa `python-multipart`: no hay formularios ni uploads.
+
+Frontend:
+- `fetch` nativo en vez de Axios.
+- Tailwind 4 con el plugin `@tailwindcss/vite`. No hay `tailwind.config.js`, `postcss.config` ni Autoprefixer: la v4 detecta las clases sola.
+- Fuentes del sistema en vez de Google Fonts (evita request a terceros). Inter y Outfit no se cargan.
+- Reconexión del WebSocket con backoff exponencial y jitter (`frontend/src/services/ws.js`) en vez de 3 s fijos.
+- `thin-scrollbar` en vez de `.custom-scrollbar`.
 
 Si encontrás otro desvío sin justificación escrita, clasificalo como "Parcial" o "Falta" y explicá el riesgo.
 
@@ -53,7 +64,7 @@ Si encontrás otro desvío sin justificación escrita, clasificalo como "Parcial
 ### A1. Arquitectura y flujo de un mensaje
 1. Existen las cuatro capas: frontend React, backend FastAPI, Ollama local, servidor MCP.
 2. Carga inicial: el frontend pide `GET /api/fundacion` al montar.
-3. `GET /api/fundacion` devuelve los documentos (`raw`) y el texto completo (`full_text`, formato `## titulo\ncontenido`). Devuelve 404 si falta el archivo de datos.
+3. `GET /api/fundacion` devuelve los documentos (`raw`) y el texto completo (`full_text`, formato `## titulo\ncontenido`). Si falta el archivo de datos no hay 404: el backend no arranca (desvío fail-fast).
 4. El chat viaja por WebSocket en `/ws/chat`.
 5. Las tools del servidor MCP se convierten al formato de Ollama: `type: "function"`, `name`, `description`, `parameters` tomado de `inputSchema`.
 6. El agente manda contexto + lista de tools al modelo.
@@ -65,9 +76,9 @@ Si encontrás otro desvío sin justificación escrita, clasificalo como "Parcial
 12. Se conserva el contexto conversacional entre preguntas de la misma conexión.
 
 ### A2. Stack tecnológico
-Para cada tecnología, indicá dónde se declara (`requirements*.txt`, `frontend/package.json`) y dónde se usa:
-Python, FastAPI, Uvicorn, Pydantic, MCP SDK, Ollama (`llama3.2`), Requests o su reemplazo, `python-multipart`, React, Vite, Axios, Tailwind CSS, PostCSS, Autoprefixer, Lucide React, WebSocket API del navegador.
-Si una librería falta, decí si hay un reemplazo y si está justificado.
+Para cada tecnología, indicá dónde se declara (`backend/requirements*.txt`, `frontend/package.json`) y dónde se usa:
+Python, FastAPI, Uvicorn, Pydantic, MCP SDK, Ollama (`llama3.2`), Requests, `python-multipart`, React, Vite, Axios, Tailwind CSS, PostCSS, Autoprefixer, Lucide React, WebSocket API del navegador.
+Ya se sabe que no están: Requests (reemplazado por `httpx`), `python-multipart`, Axios (reemplazado por `fetch`), PostCSS y Autoprefixer. Para cada uno, confirmá la ausencia y decí si el reemplazo está justificado en `CLAUDE.md`.
 
 ### A3. Backend, paso por paso
 1. Carpeta `backend/`, venv y `requirements.txt` con al menos `mcp`, `fastapi`, `uvicorn`, `pydantic`.
@@ -76,7 +87,7 @@ Si una librería falta, decí si hay un reemplazo y si está justificado.
    - Expone `consultar_fundacion_las_varillas(tema)`.
    - Busca por ID exacto y por palabra clave en título, contenido y tags.
    - Devuelve un mensaje claro cuando no encuentra resultados.
-   - Maneja el archivo de datos inexistente sin romperse.
+   - Si falta el archivo de datos sale con `exit(1)` en vez de responder texto (desvío fail-fast).
    - Cada documento devuelto incluye título, criterio y contenido.
    - Corre como script (`python -m mcp_server`).
 4. Orquestador `main.py`:
@@ -85,19 +96,20 @@ Si una librería falta, decí si hay un reemplazo y si está justificado.
    - Inyecta el índice de documentos en el system prompt.
    - El system prompt define al historiador de Las Varillas y obliga a llamar a la tool ante dudas fuera del índice.
    - Middleware CORS configurado.
-   - Logging con nivel INFO.
+   - Logging: el plan pide nivel INFO en texto. El proyecto usa logs JSON a stdout (desvío). Evaluá si cumple el objetivo: ver la confirmación al arrancar.
    - Al arrancar imprime una confirmación del tipo "MCP Conectado y Listo" (entregable 1).
-   - Se lanza con `python main.py` en el puerto 8000.
+   - Se lanza con `python main.py`, en `127.0.0.1:8000` (desvío: no `0.0.0.0`).
 5. Manejo de `WebSocketDisconnect` y de excepciones dentro del WebSocket: el error se manda al cliente.
 
 ### A4. Frontend, paso por paso
+Hay desvíos de frontend en la lista general. Evaluá cada ítem contra el equivalente declarado ahí.
 1. Proyecto Vite + React en `frontend/`.
-2. Dependencias `axios` y `lucide-react` instaladas y usadas.
-3. Tailwind configurado: `content` escanea `index.html` y `src/**/*.{js,ts,jsx,tsx}`; fuentes `Inter` (sans) y `Outfit` (display).
-4. `src/index.css`: directivas de Tailwind, Google Fonts, fondo oscuro `#0f172a` con gradientes radiales, clase `.glass` (blur 12px, borde translúcido) y `.custom-scrollbar`.
-5. Componente principal:
+2. `lucide-react` instalada y usada. `axios` no: el reemplazo es `fetch` nativo (desvío).
+3. Configuración de Tailwind 4 en `vite.config.js` con `@tailwindcss/vite`. Sin `tailwind.config.js` (desvío). Las fuentes son del sistema (desvío), no Inter ni Outfit.
+4. `src/index.css`: directivas de Tailwind, fondo oscuro `#0f172a` con gradientes radiales, clase `.glass` (blur 12px, borde translúcido) y `thin-scrollbar` (desvío: no `.custom-scrollbar`). Sin Google Fonts (desvío).
+5. Componente principal (puede estar dividido en varios archivos, como `ChatDrawer.jsx`; indicá dónde quedó cada parte):
    - Pide `/api/fundacion` al montar.
-   - Abre el WebSocket y **reintenta a los 3 s** si se cierra.
+   - Abre el WebSocket y reintenta si se cierra. Plan: 3 s fijos. Proyecto: backoff exponencial con jitter (desvío).
    - Mensaje de bienvenida del asistente.
    - Sidebar con el índice. Al hacer clic hace `scrollIntoView({ behavior: 'smooth' })` hasta el documento.
    - Botón para mostrar u ocultar el sidebar.
@@ -112,13 +124,13 @@ Si una librería falta, decí si hay un reemplazo y si está justificado.
    - Aviso si el servidor no está conectado al enviar.
    - Backdrop con blur cuando el chat está abierto.
    - Autoscroll al último mensaje.
-   - Si el componente está dividido en varios archivos, está bien; indicá dónde quedó cada parte.
 
 ### A5. Puesta en marcha
 1. `.claude/launch.json` define `backend` y `frontend`.
 2. Ejecutá `pytest` desde `backend/`. Reportá cantidad de tests y fallos.
 3. Ejecutá `npm --prefix frontend run lint` y `npm --prefix frontend run build`. Reportá errores.
 4. Si Ollama está corriendo con `llama3.2`, levantá ambos servidores con `preview_start` y probá la app en el navegador. Si no está, marcá A6 como "Sin verificar" y decí cómo verificarlo.
+5. Los evals (`python -m evals.eval_agent --reps 2`) no corren en pytest y necesitan Ollama con el modelo instalado. Si Ollama no responde, marcalos como "Sin verificar" y no los ejecutes.
 
 ### A6. Entregables del estudiante
 1. **Orquestador**: la consola del backend muestra la confirmación de conexión al arrancar. Mostrá la línea de log.
@@ -159,7 +171,7 @@ Evaluá cada principio sobre `backend/`. Para cada uno, dá evidencia a favor, v
 - Los contratos usan `abc.ABC` y `@abstractmethod`. Comprobá que instanciar la clase base lanza `TypeError`.
 - Si hay propiedades abstractas, usan `@property` encima de `@abstractmethod`.
 - Indicá si algún contrato estaría mejor como `typing.Protocol` (duck typing con chequeo estático) y por qué.
-- Hay type hints en las firmas públicas. Si `mypy` está instalado, corrélo sobre `backend/` y reportá errores. Si no está, decilo; no lo instales sin preguntar.
+- Hay type hints en las firmas públicas. Existe `backend/mypy.ini`: si `mypy` está instalado, corrélo sobre `backend/` con esa config y reportá errores. Si no está, decilo; no lo instales sin preguntar.
 - Si `pylint`, `flake8` o `ruff` están instalados, corrélos y resumí los avisos relacionados con diseño (clases largas, demasiados argumentos, acoplamiento).
 
 ### B7. Pragmatismo

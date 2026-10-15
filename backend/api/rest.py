@@ -1,11 +1,10 @@
 """REST: /api/fundacion y /api/modelos. Lee HistoryStore directo, sin MCP: funciona aunque MCP esté caído."""
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
+from llm.catalog import ProviderId
 from pydantic import BaseModel, Field
-
-from config import Settings
 from store.history import Documento, HistoryStore
 
 router = APIRouter(prefix="/api", tags=["fundacion"])
@@ -26,18 +25,12 @@ def get_fundacion(store: Annotated[HistoryStore, Depends(get_store)]) -> Fundaci
 
 
 class Modelo(BaseModel):
-    id: Literal["local", "cloud"]
+    id: ProviderId
     nombre: str
     disponible: bool = Field(description="false: falta configuración (ej: GROQ_API_KEY)")
 
 
-def get_settings(request: Request) -> Settings:
-    return request.app.state.settings
-
-
 @router.get("/modelos", response_model=list[Modelo], summary="Modelos que ofrece el selector del chat")
-def get_modelos(settings: Annotated[Settings, Depends(get_settings)]) -> list[Modelo]:
-    return [
-        Modelo(id="local", nombre=f"Local · {settings.ollama_model}", disponible=True),
-        Modelo(id="cloud", nombre=f"Nube · {settings.groq_model}", disponible=bool(settings.groq_api_key)),
-    ]
+def get_modelos(request: Request) -> list[Modelo]:
+    # El catálogo lo arma main.py en el lifespan: qué proveedores existen y cuáles tienen cliente registrado.
+    return [Modelo(id=info.id, nombre=info.nombre, disponible=info.disponible) for info in request.app.state.proveedores]
