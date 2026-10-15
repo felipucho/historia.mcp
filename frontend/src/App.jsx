@@ -14,6 +14,8 @@ import { chatReducer, initialChat } from './state/chatReducer.js'
 
 const SOCKET_URL = chatSocketUrl()
 
+// SOLID-S (responsabilidad única): App solo conecta piezas (reducer, hooks, servicios y componentes).
+// El estado del chat vive en state/chatReducer.js y la red en services/ y hooks/.
 export default function App() {
   const [docs, setDocs] = useState([])
   const [loadError, setLoadError] = useState(null)
