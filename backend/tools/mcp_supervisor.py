@@ -18,6 +18,8 @@ _STOP_TIMEOUT = 5.0
 OnOpen = Callable[[Client], Awaitable[None]]
 
 
+# SOLID-S (responsabilidad única): mantiene viva la sesión con el servidor MCP.
+# Conexión, backoff y cierre viven aquí. McpToolRegistry solo pide el cliente.
 class McpSupervisor:
     """Mantiene una sesión MCP viva y la reconecta con backoff exponencial.
 
