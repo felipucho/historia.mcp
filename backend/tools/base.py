@@ -1,5 +1,7 @@
 """Contrato de herramientas. Sin dependencias del SDK MCP: el agente y la API importan solo esto."""
 
+# SOLID-D (inversión de dependencias): este módulo no importa el SDK de MCP.
+# El agente y la API dependen de estos contratos. McpToolRegistry los implementa.
 from abc import ABC, abstractmethod
 from typing import Any
 
