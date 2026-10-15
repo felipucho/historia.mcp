@@ -6,6 +6,8 @@ from typing import Any
 from llm.provider import InvalidToolCall, ToolCall, new_tool_call_id
 
 
+# SOLID-S (responsabilidad única): convierte una tool call cruda en ToolCall.
+# La conversión vive aquí y no en cada cliente: Ollama y Groq la comparten.
 def tool_call_from_wire(raw: Any) -> ToolCall:
     """Valida un tool call del proveedor: exige function.name y arguments como objeto o como string JSON."""
     function = raw.get("function") if isinstance(raw, dict) else None
