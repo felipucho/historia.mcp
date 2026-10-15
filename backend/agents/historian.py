@@ -69,6 +69,8 @@ class Conversation:
 class HistorianAgent:
     """El historial es por conversación, no por proveedor: se puede cambiar de modelo a mitad de charla."""
 
+    # SOLID-D (inversión de dependencias): recibe LLMProvider y ToolRegistry, ambos abstractos.
+    # No importa OllamaClient ni McpToolRegistry: quien arma el agente decide la implementación.
     def __init__(
         self,
         llm: LLMProvider | Mapping[ProviderId, LLMProvider],
