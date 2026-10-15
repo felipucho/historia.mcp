@@ -10,6 +10,8 @@ BACKEND_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BACKEND_DIR.parent
 
 
+# SOLID-S (responsabilidad única): lee y valida la configuración (.env y entorno).
+# Config inválida = no arranca. El resto del backend recibe valores ya validados.
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
