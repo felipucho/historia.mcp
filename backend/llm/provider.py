@@ -74,6 +74,8 @@ class LLMProvider(ABC):
     @abstractmethod
     async def chat(self, messages: Sequence[Message], tools: Sequence[ToolSpec]) -> LLMResponse: ...
 
+    # SOLID-O (abierto/cerrado): el streaming es una extensión opcional de LLMProvider.
+    # Un proveedor sin streaming hereda esta versión: el agente no cambia por eso.
     async def chat_stream(self, messages: Sequence[Message], tools: Sequence[ToolSpec], on_delta: DeltaCallback) -> LLMResponse:
         """Igual que chat, pero emite el texto por on_delta mientras se genera. Devuelve la respuesta completa.
 
