@@ -15,6 +15,8 @@ TOOL_SPEC = ToolSpec(
 )
 
 
+# SOLID-L (sustitución de Liskov): FakeLLM cumple LLMProvider y reemplaza a OllamaClient en tests.
+# Hereda chat_stream por defecto: el agente corre igual con el doble.
 class FakeLLM(LLMProvider):
     """Respuestas guionadas (lista) o calculadas (callable). Registra los mensajes de cada llamada."""
 
@@ -42,6 +44,7 @@ class FakeLLM(LLMProvider):
         return None
 
 
+# SOLID-L (sustitución de Liskov): FakeTools cumple ToolRegistry y reemplaza a McpToolRegistry.
 class FakeTools(ToolRegistry):
     def __init__(self, results: dict[str, str] | None = None, *, unavailable: bool = False) -> None:
         self._results = results or {}
