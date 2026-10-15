@@ -54,6 +54,8 @@ def _missing_terms(store: HistoryStore, tema: str, unmatched: list[str], user_qu
     return [term for term in missing if len(term) <= _MAX_WARNED_TERM_CHARS][:_MAX_WARNED_TERMS]
 
 
+# SOLID-O (abierto/cerrado): para agregar una tool se declara aquí.
+# McpToolRegistry la descubre con tools/list: el cliente no cambia.
 def build_server(store: HistoryStore) -> MCPServer:
     server = MCPServer("HistoriaVarillas")
 
