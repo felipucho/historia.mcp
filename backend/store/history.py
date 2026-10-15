@@ -101,6 +101,8 @@ class SearchResult:
     unmatched_terms: list[str]
 
 
+# SOLID-S (responsabilidad única): carga, valida y busca documentos.
+# No conoce MCP, LLM ni HTTP. El formato para el modelo está en store/render.py.
 class HistoryStore:
     def __init__(self, documents: Sequence[Documento]) -> None:
         if not documents:
