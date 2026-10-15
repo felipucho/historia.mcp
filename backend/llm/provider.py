@@ -46,6 +46,8 @@ class LLMResponse(BaseModel):
     tool_calls: list[ToolCall] = Field(default_factory=list)
 
 
+# SOLID-L (sustitución de Liskov): LLMUnavailable, LLMTimeout e InvalidToolCall heredan de LLMError.
+# Quien captura LLMError atrapa cualquier falla de proveedor, sin conocer cuál es.
 class LLMError(Exception):
     """Error del proveedor. El mensaje se loguea; no se muestra crudo al usuario."""
 
