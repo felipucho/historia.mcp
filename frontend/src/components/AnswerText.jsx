@@ -1,5 +1,7 @@
 import { parseAnswer } from '../lib/markdown.js'
 
+// SOLID-S (responsabilidad única): solo dibuja las partes que devuelve parseAnswer.
+// La interpretación del markdown está en lib/markdown.js.
 /** Markdown mínimo como nodos de React. Nunca HTML: la salida del LLM no es confiable. */
 export default function AnswerText({ text }) {
   return parseAnswer(text).map((segment, index) => {
