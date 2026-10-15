@@ -42,6 +42,8 @@ async def _warm_up(llm: LLMProvider) -> None:
         logger.warning("ollama_warm_up_failed", extra={"error": str(exc)})
 
 
+# SOLID-D (inversión de dependencias): raíz de composición del backend.
+# Instancia las clases concretas y se las entrega al agente como abstracciones.
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
