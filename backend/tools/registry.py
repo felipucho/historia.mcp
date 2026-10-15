@@ -30,6 +30,8 @@ async def _fetch_tools(client: Client) -> dict[str, ToolSpec]:
             return tools
 
 
+# SOLID-S (responsabilidad única): descubre las tools y las ejecuta.
+# La conexión y los reintentos no están aquí: los maneja McpSupervisor.
 class McpToolRegistry(ToolRegistry):
     """Descubre y ejecuta las tools del servidor MCP. La conexión y los reintentos los maneja McpSupervisor."""
 
