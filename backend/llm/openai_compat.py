@@ -27,6 +27,8 @@ from llm.wire import tool_call_from_wire
 logger = logging.getLogger(__name__)
 
 
+# SOLID-S (responsabilidad única): traduce el contrato LLMProvider a /chat/completions.
+# No decide nada del agente: arma el payload y parsea la respuesta.
 class OpenAICompatClient(LLMProvider):
     def __init__(
         self,
