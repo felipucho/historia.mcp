@@ -60,6 +60,8 @@ SCENARIOS: dict[str, list[tuple[str, list[str], list[str]]]] = {
 }
 
 
+# SOLID-L (sustitución de Liskov): _RecordingTools cumple ToolRegistry y graba cada llamada.
+# El agente no sabe que lo observan: mismas firmas, mismos tipos.
 class _RecordingTools(ToolRegistry):
     """Registra qué buscó el modelo y qué documentos volvieron, para leer los fallos."""
 
