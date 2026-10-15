@@ -7,6 +7,8 @@ const HEADING = /^#{1,6}\s+(.*)$/gm
 // **negrita** o *cursiva*. El grupo de captura hace que split deje los fragmentos marcados en índices impares.
 const EMPHASIS = /(\*\*[^*]+?\*\*|\*[^*\s][^*]*?\*)/g
 
+// SOLID-S (responsabilidad única): convierte el texto de la respuesta en partes, sin React ni HTML.
+// Se prueba con node --test, sin renderizar nada.
 /** Parte la respuesta en segmentos { type: 'text' | 'strong' | 'em', content }. No interpreta HTML. */
 export function parseAnswer(text) {
   const clean = text.replace(CITATION_MARK, '').replace(HEADING, '**$1**')
