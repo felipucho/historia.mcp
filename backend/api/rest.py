@@ -30,6 +30,8 @@ class Modelo(BaseModel):
     disponible: bool = Field(description="false: falta configuración (ej: GROQ_API_KEY)")
 
 
+# SOLID-O (abierto/cerrado): la lista de modelos sale de app.state.proveedores.
+# Un proveedor nuevo aparece en el selector sin tocar este endpoint.
 @router.get("/modelos", response_model=list[Modelo], summary="Modelos que ofrece el selector del chat")
 def get_modelos(request: Request) -> list[Modelo]:
     # El catálogo lo arma main.py en el lifespan: qué proveedores existen y cuáles tienen cliente registrado.
