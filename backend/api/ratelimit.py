@@ -5,6 +5,8 @@ from collections import Counter
 from collections.abc import Callable
 
 
+# SOLID-S (responsabilidad única): límites de uso en memoria (token bucket y conexiones por IP).
+# El transporte solo los consulta: no conoce cómo se calculan.
 class TokenBucket:
     def __init__(self, capacity: int, refill_per_second: float, clock: Callable[[], float] = time.monotonic) -> None:
         self._capacity = capacity
