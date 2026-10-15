@@ -120,6 +120,8 @@ def _parse(text: str | None) -> ChatIn:
         raise ValueError(str(exc)) from exc
 
 
+# SOLID-S (responsabilidad única): transporte. Traduce respuestas y errores del agente a eventos.
+# No tiene lógica de agente: el razonamiento está en HistorianAgent.
 async def _run_turn(
     channel: _Channel, agent: HistorianAgent, conversation: Conversation, text: str, provider: ProviderId
 ) -> None:
