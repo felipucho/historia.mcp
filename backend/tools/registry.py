@@ -19,6 +19,8 @@ _CONNECTION_CLOSED = -32000
 _LIVENESS_TIMEOUT = 3.0
 
 
+# SOLID-O (abierto/cerrado): las tools se descubren con tools/list, no están fijas en el código.
+# Agregar una tool en mcp_server.py no obliga a tocar este módulo.
 async def _fetch_tools(client: Client) -> dict[str, ToolSpec]:
     tools: dict[str, ToolSpec] = {}
     cursor: str | None = None
