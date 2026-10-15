@@ -17,6 +17,8 @@ TOOL_SPEC = ToolSpec(
 
 # SOLID-L (sustitución de Liskov): FakeLLM cumple LLMProvider y reemplaza a OllamaClient en tests.
 # Hereda chat_stream por defecto: el agente corre igual con el doble.
+# SOLID-D (inversión de dependencias): los tests inyectan estos dobles (FakeLLM y FakeTools) por constructor.
+# El agente no sabe que son falsos: depende solo de las abstracciones.
 class FakeLLM(LLMProvider):
     """Respuestas guionadas (lista) o calculadas (callable). Registra los mensajes de cada llamada."""
 
