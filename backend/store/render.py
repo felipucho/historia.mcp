@@ -12,6 +12,8 @@ from store.history import Documento
 _RENDERED_ID_RE = re.compile(r"^\[([A-Za-z0-9][A-Za-z0-9_-]*)\] ", re.MULTILINE)
 
 
+# SOLID-S (responsabilidad única): arma el texto que lee el modelo (índice y documentos).
+# Separado de HistoryStore: cambiar el formato no toca la carga ni la búsqueda.
 def render_index(documents: Iterable[Documento]) -> str:
     return "\n".join(
         f"- ID: {doc.id} | {doc.titulo} | Fecha clave: {doc.metadata.fecha_clave} | Tags: {', '.join(doc.tags)}"
