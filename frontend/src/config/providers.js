@@ -1,5 +1,7 @@
 import { Cloud, Cpu } from 'lucide-react'
 
+// SOLID-O (abierto/cerrado): la presentación de cada proveedor (nombre, ícono) vive aquí.
+// Agregar un proveedor es una entrada nueva. Los componentes que la leen no cambian.
 // Presentación de cada proveedor del selector. Qué proveedores existen y cuáles están disponibles lo dice /api/modelos.
 // Un proveedor nuevo en el backend (llm/catalog.py) necesita una entrada acá: sin ella el selector no lo muestra.
 export const PROVIDERS = {
