@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 
+# SOLID-O (abierto/cerrado): un proveedor nuevo se agrega aquí, en main.py y en providers.js.
+# ChatIn, /api/modelos y HistorianAgent salen de este enum: esos módulos no cambian.
 class ProviderId(StrEnum):
     LOCAL = "local"
     CLOUD = "cloud"
