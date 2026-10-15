@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { CLOSE_POLICY_VIOLATION, parseServerEvent, reconnectDelay } from '../services/ws.js'
 
+// SOLID-S (responsabilidad única): mantiene la conexión y su estado dentro de React.
+// El protocolo (URL, eventos, backoff) viene de services/ws.js.
 /**
  * Conexión WebSocket persistente con reconexión por backoff.
  * status: 'connecting' | 'open' | 'reconnecting' | 'rejected'
