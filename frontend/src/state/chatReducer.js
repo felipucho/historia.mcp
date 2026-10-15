@@ -15,6 +15,8 @@ export const initialChat = {
 const append = (chat, role, content, extra) => [...chat.messages, { id: chat.messages.length, role, content, ...extra }]
 const settle = { pending: false, agentState: 'idle', tool: null, detail: null, streaming: '' }
 
+// SOLID-S (responsabilidad única): estado del chat como función pura, sin React.
+// Recibe estado y acción, devuelve el estado nuevo. Se prueba con node --test.
 export function chatReducer(chat, action) {
   switch (action.type) {
     case 'sent':
