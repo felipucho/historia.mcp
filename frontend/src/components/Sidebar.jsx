@@ -1,5 +1,7 @@
 import { History } from 'lucide-react'
 
+// SOLID-S (responsabilidad única): solo lista los documentos y avisa cuál se eligió.
+// Recibe docs, open y onNavigate por props: no carga datos ni hace scroll.
 export default function Sidebar({ docs, open, onNavigate }) {
   return (
     <aside
