@@ -2,6 +2,8 @@ import { BookOpen, Loader2, Send, Sparkles, TriangleAlert, X } from 'lucide-reac
 import { useEffect, useRef, useState } from 'react'
 
 import { PROVIDERS } from '../config/providers.js'
+// SOLID-D (inversión de dependencias): la constante viene de constants.js, no de services/ws.js.
+// El componente no depende de la capa de transporte.
 import { MAX_TEXT_CHARS } from '../constants.js'
 import AnswerText from './AnswerText.jsx'
 
