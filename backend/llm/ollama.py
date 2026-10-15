@@ -28,6 +28,8 @@ _HEALTH_TIMEOUT = httpx.Timeout(5.0)
 _TEXT_TOOL_CALL_KEYS = {"type", "name", "parameters", "arguments"}
 
 
+# SOLID-S (responsabilidad única): traduce el contrato LLMProvider al formato de Ollama.
+# No decide nada del agente: arma el payload y parsea la respuesta.
 class OllamaClient(LLMProvider):
     def __init__(
         self,
