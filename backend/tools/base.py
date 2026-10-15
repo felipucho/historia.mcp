@@ -14,6 +14,8 @@ class ToolsUnavailable(Exception):
     """El backend de herramientas no está disponible."""
 
 
+# SOLID-I (segregación de interfaces): solo dos métodos abstractos, specs y call.
+# El agente no ve conexión, reintentos ni backoff: esos detalles quedan en la implementación.
 class ToolRegistry(ABC):
     @abstractmethod
     async def specs(self) -> list[ToolSpec]:
