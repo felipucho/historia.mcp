@@ -30,6 +30,8 @@ _TEXT_TOOL_CALL_KEYS = {"type", "name", "parameters", "arguments"}
 
 # SOLID-S (responsabilidad única): traduce el contrato LLMProvider al formato de Ollama.
 # No decide nada del agente: arma el payload y parsea la respuesta.
+# SOLID-L (sustitución de Liskov): OllamaClient cumple LLMProvider con las mismas firmas.
+# El agente la usa sin distinguirla de OpenAICompatClient ni de FakeLLM.
 class OllamaClient(LLMProvider):
     def __init__(
         self,
