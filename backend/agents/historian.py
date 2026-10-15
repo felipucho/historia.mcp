@@ -40,6 +40,8 @@ def _detail(arguments: dict[str, Any]) -> str | None:
     return text.strip()[:_MAX_DETAIL_CHARS] if text else None
 
 
+# SOLID-S (responsabilidad única): historial de una conexión, solo pares pregunta-respuesta.
+# Los resultados de tools se descartan a propósito: son la mayoría de los tokens.
 class Conversation:
     """Historial de UNA conexión: system prompt fijo + ventana de los últimos N turnos.
 
@@ -62,6 +64,8 @@ class Conversation:
         return len(self._turns)
 
 
+# SOLID-S (responsabilidad única): solo el loop de razonamiento con tools.
+# No sabe de WebSocket ni de HTTP: el transporte está en api/ws.py.
 class HistorianAgent:
     """El historial es por conversación, no por proveedor: se puede cambiar de modelo a mitad de charla."""
 
