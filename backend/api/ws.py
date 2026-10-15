@@ -56,6 +56,8 @@ class ChatIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     text: Annotated[str, AfterValidator(sanitize_text)]
+    # SOLID-O (abierto/cerrado): el proveedor se valida contra el enum ProviderId.
+    # Un proveedor nuevo entra por el catálogo: este modelo no cambia.
     provider: ProviderId = DEFAULT_PROVIDER
 
 
