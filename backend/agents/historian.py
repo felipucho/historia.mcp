@@ -106,6 +106,8 @@ class HistorianAgent:
         Lo que se emitió antes de una tool call (preámbulo del modelo) queda descartado: el cliente
         lo borra al recibir el estado tool_call, y la respuesta final es lo que devuelve este método.
         """
+        # SOLID-O (abierto/cerrado): el proveedor se busca en el dict, sin if por proveedor.
+        # Agregar un proveedor no cambia esta búsqueda: solo suma una entrada en main.py.
         if (llm := self._llms.get(provider)) is None:
             raise UnknownProvider(f"Proveedor no configurado: {provider}")
         # Sin tools no se consulta al modelo: un 3B sin datos inventa historia.
