@@ -29,6 +29,8 @@ def _read(directory: Path, name: str, default: str) -> str:
         return default
 
 
+# SOLID-S (responsabilidad única): arma el system prompt (persona, reglas e índice).
+# El agente recibe el texto ya armado: no lee archivos ni conoce ia_config.
 def build_system_prompt(ia_config_dir: Path, index_text: str) -> str:
     nombre = _read(ia_config_dir, "nombre.txt", "Asistente Histórico")
     personalidad = _read(ia_config_dir, "personalidad.txt", "Sos un experto en la historia de Las Varillas.")
