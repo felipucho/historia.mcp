@@ -1,3 +1,5 @@
+// SOLID-S (responsabilidad única): pide datos por HTTP y los devuelve.
+// No guarda estado ni renderiza: quien llama decide qué hacer con la respuesta.
 /** GET /api/fundacion → { raw, full_text }. Ruta relativa: en dev la resuelve el proxy de Vite. */
 export async function fetchFundacion(signal) {
   const response = await fetch('/api/fundacion', { signal, headers: { Accept: 'application/json' } })
