@@ -100,6 +100,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         system_prompt = build_system_prompt(settings.ia_config_dir, render_index(store.documents))
         app.state.settings = settings
         app.state.store = store
+        # SOLID-O (abierto/cerrado): cada proveedor es una entrada más de este dict.
+        # La nube entra solo si hay API key de Groq. El agente no tiene if por proveedor.
         # Sin key el proveedor "cloud" no se registra: el agente responde provider_unavailable.
         llms: dict[ProviderId, LLMProvider] = {ProviderId.LOCAL: llm}
         if settings.groq_api_key:
