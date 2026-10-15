@@ -18,6 +18,7 @@ const CONNECTION = {
   rejected: { label: 'Conexión rechazada por el servidor', dot: 'bg-red-500' },
 }
 
+// SOLID-S (responsabilidad única): solo el selector de modelo.
 function ModelToggle({ models, provider, onChange, disabled }) {
   return (
     <div role="radiogroup" aria-label="Modelo de lenguaje" className="flex rounded-xl border border-white/10 bg-slate-900 p-1">
@@ -48,6 +49,7 @@ function ModelToggle({ models, provider, onChange, disabled }) {
   )
 }
 
+// SOLID-S (responsabilidad única): solo muestra las fuentes citadas de una respuesta.
 function Sources({ ids, docsById, onOpen }) {
   const docs = ids.map((id) => docsById.get(id)).filter(Boolean)
   if (docs.length === 0) return null
@@ -69,6 +71,7 @@ function Sources({ ids, docsById, onOpen }) {
   )
 }
 
+// SOLID-S (responsabilidad única): solo dibuja un mensaje (del usuario o del agente).
 function Bubble({ message, docsById, onOpenSource }) {
   if (message.role === 'user') {
     return (
@@ -106,6 +109,8 @@ function Bubble({ message, docsById, onOpenSource }) {
   )
 }
 
+// SOLID-S (responsabilidad única): cajón del chat. Compone selector, burbujas y entrada.
+// El estado llega en chat y las acciones en actions: el componente no llama servicios.
 export default function ChatDrawer({ open, chat, connection, models, provider, docsById, actions }) {
   const { messages, pending, agentState, tool, detail, streaming, streamingProvider } = chat
   const { onClose, onSend, onProviderChange, onOpenSource } = actions
