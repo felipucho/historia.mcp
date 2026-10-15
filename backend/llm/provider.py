@@ -72,6 +72,8 @@ class InvalidToolCall(LLMError):
     """El modelo intentó llamar una herramienta con un formato o nombre inválido."""
 
 
+# SOLID-I (segregación de interfaces): solo chat y health son abstractos.
+# chat_stream, warm_up y aclose son opcionales y tienen valor por defecto.
 class LLMProvider(ABC):
     @abstractmethod
     async def chat(self, messages: Sequence[Message], tools: Sequence[ToolSpec]) -> LLMResponse: ...
