@@ -1,11 +1,17 @@
 import asyncio
+import os
 from collections.abc import Callable, Sequence
 
 import pytest
 from config import ROOT_DIR
 from llm.provider import LLMProvider, LLMResponse, Message, ToolSpec
+from pymongo import MongoClient
 from store.history import HistoryStore
+from store.mongo_repository import MongoBookRepository
+from store.repository import BookRepository
 from tools.base import ToolError, ToolRegistry, ToolsUnavailable
+
+from tests.fake_repository import FakeRepo
 
 TOOL_NAME = "consultar_fundacion_las_varillas"
 TOOL_SPEC = ToolSpec(
@@ -70,3 +76,32 @@ class FakeTools(ToolRegistry):
 @pytest.fixture(scope="session")
 def store() -> HistoryStore:
     return HistoryStore.from_file(ROOT_DIR / "fundacion.json")
+
+
+@pytest.fixture
+def mongo_repo() -> MongoBookRepository:
+    """Repositorio real sobre una base de prueba. Se salta si MONGODB_URL_TEST no está definida.
+
+    Solo borra bases cuyo nombre termina en _test: nunca toca la base de la aplicación.
+    """
+    url = os.environ.get("MONGODB_URL_TEST")
+    if not url:
+        pytest.skip("MONGODB_URL_TEST no definida")
+    db_name = os.environ.get("MONGODB_DB_TEST", "historia_test")
+    if not db_name.endswith("_test"):
+        raise pytest.UsageError("MONGODB_DB_TEST tiene que terminar en _test")
+    admin = MongoClient(url, serverSelectionTimeoutMS=3000)
+    admin.drop_database(db_name)
+    repo = MongoBookRepository.from_url(url, db_name)
+    yield repo
+    repo.cerrar()
+    admin.drop_database(db_name)
+    admin.close()
+
+
+# La misma batería corre contra el fake y contra MongoBookRepository (este último solo con MONGODB_URL_TEST).
+@pytest.fixture(params=["fake", pytest.param("mongo", marks=pytest.mark.mongo)])
+def repo(request) -> BookRepository:
+    if request.param == "fake":
+        return FakeRepo()
+    return request.getfixturevalue("mongo_repo")

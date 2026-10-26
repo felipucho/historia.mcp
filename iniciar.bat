@@ -11,6 +11,15 @@ if not exist ".venv\Scripts\python.exe" (
     pause
     exit /b 1
 )
+if not exist ".env" (
+    echo No se encontro .env. Copia .env.example a .env y completa MONGODB_URL.
+    pause
+    exit /b 1
+)
+rem El backend lee los libros de MongoDB: sin la base no arranca.
+sc query MongoDB | findstr /i "RUNNING" >nul
+if errorlevel 1 echo Aviso: el servicio MongoDB no esta RUNNING. Si la base corre a mano, ignora este aviso.
+
 if not exist "frontend\node_modules" (
     echo Instalando dependencias del frontend...
     call npm --prefix frontend install

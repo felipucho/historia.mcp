@@ -104,8 +104,9 @@ class SearchResult:
 # SOLID-S (responsabilidad única): carga, valida y busca documentos.
 # No conoce MCP, LLM ni HTTP. El formato para el modelo está en store/render.py.
 class HistoryStore:
-    def __init__(self, documents: Sequence[Documento]) -> None:
-        if not documents:
+    # permitir_vacio: la base de libros puede no tener ningún libro publicado todavía (arranque con Mongo vacío).
+    def __init__(self, documents: Sequence[Documento], *, permitir_vacio: bool = False) -> None:
+        if not documents and not permitir_vacio:
             raise HistoryStoreError("El corpus histórico está vacío")
         ids = [doc.id for doc in documents]
         if duplicates := sorted({doc_id for doc_id in ids if ids.count(doc_id) > 1}):

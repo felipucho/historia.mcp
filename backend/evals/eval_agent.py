@@ -20,7 +20,8 @@ from config import Settings
 from llm.ollama import OllamaClient
 from llm.provider import ToolSpec
 from mcp_server import build_server
-from store.history import HistoryStore
+from store.corpus import CorpusVivo
+from store.mongo_repository import MongoBookRepository
 from store.render import render_index
 from tools.base import ToolRegistry
 from tools.registry import McpToolRegistry
@@ -85,7 +86,10 @@ async def _noop_status(state: str, tool: str | None, detail: str | None = None) 
 
 async def run(scenarios: dict, repetitions: int, temperature: float | None) -> int:
     settings = Settings()
-    store = HistoryStore.from_file(settings.data_file)
+    if not settings.mongodb_url:
+        raise SystemExit("Falta MONGODB_URL en .env: las evals leen los libros de la base")
+    corpus = CorpusVivo(MongoBookRepository.from_url(settings.mongodb_url.get_secret_value(), settings.mongodb_db))
+    store = corpus.store()
     temperature = settings.ollama_temperature if temperature is None else temperature
     print(f"modelo={settings.ollama_model} temperatura={temperature}")
     llm = OllamaClient(
@@ -97,7 +101,7 @@ async def run(scenarios: dict, repetitions: int, temperature: float | None) -> i
         read_timeout=settings.ollama_read_timeout,
         temperature=temperature,
     )
-    registry = McpToolRegistry(build_server(store), connect_timeout=20, call_timeout=15, retry_base=2, retry_max=60)
+    registry = McpToolRegistry(build_server(corpus), connect_timeout=20, call_timeout=15, retry_base=2, retry_max=60)
     tools = _RecordingTools(registry)
     agent = HistorianAgent(llm, tools, build_system_prompt(settings.ia_config_dir, render_index(store.documents)))
     failures: Counter[str] = Counter()
