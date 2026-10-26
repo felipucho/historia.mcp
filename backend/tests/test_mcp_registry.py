@@ -8,10 +8,13 @@ from mcp import Client, StdioServerParameters
 from mcp.types import RequestParamsMeta, TextContent
 from mcp_meta import USER_QUESTION_META
 from mcp_server import build_server
+from scripts.seed_from_json import construir_libro, sembrar
+from store.corpus import CorpusVivo
 from tools.base import ToolError, ToolsUnavailable
 from tools.registry import McpToolRegistry
 
 from tests.conftest import TOOL_NAME
+from tests.fake_repository import FakeRepo
 
 
 def _registry(server, **overrides) -> McpToolRegistry:
@@ -19,8 +22,20 @@ def _registry(server, **overrides) -> McpToolRegistry:
     return McpToolRegistry(server, **options)
 
 
+def _corpus(store) -> CorpusVivo:
+    repo = FakeRepo()
+    sembrar(repo, store, construir_libro("debates-origen", "Debates", "Autor de prueba", 2024, "secundaria"))
+    return CorpusVivo(repo)
+
+
+def _texto(result) -> str:
+    [block] = result.content
+    assert isinstance(block, TextContent)
+    return block.text
+
+
 async def test_descubre_tools_y_ejecuta_busqueda(store):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         await registry.connect()
         [spec] = await registry.specs()
@@ -35,7 +50,7 @@ async def test_descubre_tools_y_ejecuta_busqueda(store):
 
 
 async def test_specs_reutiliza_la_conexion_viva(store, caplog):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     caplog.set_level("INFO", logger="tools.registry")
     try:
         for _ in range(3):
@@ -47,7 +62,7 @@ async def test_specs_reutiliza_la_conexion_viva(store, caplog):
 
 
 async def test_pregunta_original_por_meta_detecta_nombre_aunque_el_modelo_busque_solo_apellido(store):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         await registry.connect()
         result = await registry.call(TOOL_NAME, {"tema": "Alvarez"}, user_question="¿Quién fue Juan Alvarez?")
@@ -65,7 +80,7 @@ async def test_pregunta_original_por_meta_detecta_nombre_aunque_el_modelo_busque
     ],
 )
 async def test_preguntas_validas_no_generan_aviso(store, tema, question):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         await registry.connect()
         result = await registry.call(TOOL_NAME, {"tema": tema}, user_question=question)
@@ -76,7 +91,7 @@ async def test_preguntas_validas_no_generan_aviso(store, tema, question):
 
 
 async def test_meta_invalido_se_ignora_sin_romper_la_tool(store):
-    async with Client(build_server(store)) as client:
+    async with Client(build_server(_corpus(store))) as client:
         result = await client.call_tool(TOOL_NAME, {"tema": "Lorenzo Dabbene"}, meta=cast(RequestParamsMeta, {USER_QUESTION_META: {"x": 1}}))
     [block] = result.content
     assert not result.is_error
@@ -87,7 +102,7 @@ async def test_meta_invalido_se_ignora_sin_romper_la_tool(store):
 async def test_aviso_acota_cantidad_y_largo_de_terminos(store):
     long_word = "x" * 60
     question = f"¿Qué dicen alfa beta gama {long_word}?"
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         await registry.connect()
         result = await registry.call(TOOL_NAME, {"tema": question}, user_question=question)
@@ -99,7 +114,7 @@ async def test_aviso_acota_cantidad_y_largo_de_terminos(store):
 
 
 async def test_terminos_inventados_por_el_modelo_no_se_repiten(store):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         await registry.connect()
         result = await registry.call(TOOL_NAME, {"tema": "mundoalberto2022"}, user_question="¿Quién ganó el mundial 2022?")
@@ -110,7 +125,7 @@ async def test_terminos_inventados_por_el_modelo_no_se_repiten(store):
 
 
 async def test_tema_es_obligatorio_y_vacio_pide_palabras_clave(store):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         [spec] = await registry.specs()
         result = await registry.call(TOOL_NAME, {"tema": "  "})
@@ -121,7 +136,7 @@ async def test_tema_es_obligatorio_y_vacio_pide_palabras_clave(store):
 
 
 async def test_sin_resultados_devuelve_indice_para_reintentar(store):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         await registry.connect()
         result = await registry.call(TOOL_NAME, {"tema": "tren"})
@@ -132,13 +147,23 @@ async def test_sin_resultados_devuelve_indice_para_reintentar(store):
 
 
 async def test_tool_desconocida_es_tool_error(store):
-    registry = _registry(build_server(store))
+    registry = _registry(build_server(_corpus(store)))
     try:
         await registry.connect()
         with pytest.raises(ToolError):
             await registry.call("preguntar_a_ollama", {"prompt": "x"})
     finally:
         await registry.aclose()
+
+
+async def test_criterio_a4_libro_publicado_se_encuentra_sin_reiniciar_el_servidor(repo, store):
+    async with Client(build_server(CorpusVivo(repo))) as client:
+        antes = await client.call_tool(TOOL_NAME, {"tema": "Valter Dabbene"})
+        sembrar(repo, store, construir_libro("debates-origen", "Debates", "Autor de prueba", 2024, "secundaria"))
+        despues = await client.call_tool(TOOL_NAME, {"tema": "Valter Dabbene"})
+
+    assert "debates_origen_02" not in _texto(antes)
+    assert "debates_origen_02" in _texto(despues)
 
 
 async def test_servidor_que_muere_aplica_backoff():

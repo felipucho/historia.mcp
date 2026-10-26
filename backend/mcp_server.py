@@ -13,9 +13,13 @@ from config import Settings
 from logging_config import setup_logging
 from mcp.server.mcpserver import Context, MCPServer
 from mcp_meta import AVISO_PREFIJO, USER_QUESTION_MAX_CHARS, USER_QUESTION_META
-from pydantic import Field
-from store.history import HistoryStore, HistoryStoreError, normalize, tokenize
+from pydantic import Field, ValidationError
+from pymongo.errors import PyMongoError
+from store.corpus import CorpusVivo
+from store.history import HistoryStore, normalize, tokenize
+from store.mongo_repository import MongoBookRepository
 from store.render import render_documents, render_index
+from store.repository import RepositorioError
 
 logger = logging.getLogger("mcp_server")
 
@@ -56,7 +60,7 @@ def _missing_terms(store: HistoryStore, tema: str, unmatched: list[str], user_qu
 
 # SOLID-O (abierto/cerrado): para agregar una tool se declara aquí.
 # McpToolRegistry la descubre con tools/list: el cliente no cambia.
-def build_server(store: HistoryStore) -> MCPServer:
+def build_server(corpus: CorpusVivo) -> MCPServer:
     server = MCPServer("HistoriaVarillas")
 
     @server.tool(structured_output=False)
@@ -74,6 +78,7 @@ def build_server(store: HistoryStore) -> MCPServer:
             logger.info("tool_empty_tema")
             return "Falta 'tema'. Volvé a llamar la herramienta con palabras clave concretas (ej: 'fundación', 'ferrocarril')."
         user_question = _user_question(ctx)
+        store = corpus.store()
         result = store.search(tema)
         missing = _missing_terms(store, tema, result.unmatched_terms, user_question)
         logger.info(
@@ -100,14 +105,19 @@ def build_server(store: HistoryStore) -> MCPServer:
 def main() -> None:
     settings = Settings()
     setup_logging(settings.log_level, stream=sys.stderr)
-    try:
-        store = HistoryStore.from_file(settings.data_file)
-    except HistoryStoreError as exc:
-        logger.critical("mcp_server_data_error", extra={"error": str(exc)})
+    url = settings.mongodb_url.get_secret_value() if settings.mongodb_url else ""
+    if not url:
+        logger.critical("mcp_server_sin_mongodb_url")
         sys.exit(1)
-    logger.info("mcp_server_start", extra={"documents": len(store.documents)})
     try:
-        build_server(store).run("stdio")
+        corpus = CorpusVivo(MongoBookRepository.from_url(url, settings.mongodb_db))
+        documentos = len(corpus.store().documents)
+    except (RepositorioError, PyMongoError, ValidationError) as exc:
+        logger.critical("mcp_server_db_error", extra={"error": str(exc)})
+        sys.exit(1)
+    logger.info("mcp_server_start", extra={"documents": documentos})
+    try:
+        build_server(corpus).run("stdio")
     except KeyboardInterrupt:  # Ctrl+C llega también al hijo en la misma consola
         pass
 

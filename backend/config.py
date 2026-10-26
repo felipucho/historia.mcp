@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, HttpUrl, field_validator
+from pydantic import Field, HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -22,6 +22,10 @@ class Settings(BaseSettings):
 
     data_file: Path = ROOT_DIR / "fundacion.json"
     ia_config_dir: Path = ROOT_DIR / "ia_config"
+
+    # Base de datos (spec 01). Opcionales mientras el backend no lee de Mongo; la siembra los exige.
+    mongodb_url: SecretStr | None = None
+    mongodb_db: str = Field("historia", min_length=1)
 
     ollama_url: HttpUrl = HttpUrl("http://localhost:11434")
     ollama_model: str = Field("llama3.2", min_length=1)

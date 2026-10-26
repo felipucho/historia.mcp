@@ -25,14 +25,34 @@ from llm.openai_compat import OpenAICompatClient
 from llm.provider import LLMError, LLMProvider
 from logging_config import setup_logging
 from mcp import StdioServerParameters
-from store.history import HistoryStore, HistoryStoreError
+from pymongo.errors import PyMongoError
+from store.corpus import documentos_publicados
+from store.history import HistoryStore
+from store.mongo_repository import MongoBookRepository
 from store.render import render_index
+from store.repository import BookRepository, RepositorioError
 from tools.base import ToolsUnavailable
 from tools.registry import McpToolRegistry
 
 settings = Settings()
 setup_logging(settings.log_level)
 logger = logging.getLogger("backend")
+
+
+def url_mongodb() -> str:
+    url = settings.mongodb_url.get_secret_value() if settings.mongodb_url else ""
+    if not url:
+        raise RuntimeError("Falta MONGODB_URL en .env: el backend lee los libros de MongoDB")
+    return url
+
+
+def abrir_repositorio() -> BookRepository:
+    """Abre la base de libros. Sin URL, o con una URL que no conecta, el arranque falla y el error nombra la variable."""
+    url = url_mongodb()
+    try:
+        return MongoBookRepository.from_url(url, settings.mongodb_db)
+    except RepositorioError as exc:
+        raise RuntimeError(f"MONGODB_URL no funciona: {exc}. Revisá la variable en .env") from None
 
 
 async def _warm_up(llm: LLMProvider) -> None:
@@ -46,12 +66,17 @@ async def _warm_up(llm: LLMProvider) -> None:
 # Instancia las clases concretas y se las entrega al agente como abstracciones.
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    repo = abrir_repositorio()
     try:
-        store = HistoryStore.from_file(settings.data_file)
-    except HistoryStoreError as exc:
-        logger.critical("data_invalid", extra={"error": str(exc)})
-        raise
-    logger.info("store_loaded", extra={"documents": len(store.documents), "file": str(settings.data_file)})
+        documentos = documentos_publicados(repo)
+    except PyMongoError:
+        raise RuntimeError("No se pudieron leer los libros de MongoDB. Revisá la conexión.") from None
+    finally:
+        repo.cerrar()
+    if not documentos:
+        logger.warning("sin_libros_publicados", extra={"effect": "el chat responde sin documentos hasta publicar un libro"})
+    store = HistoryStore(documentos, permitir_vacio=True)
+    logger.info("store_loaded", extra={"documents": len(documentos), "source": "mongodb"})
 
     llm = OllamaClient(
         settings.ollama_base_url,
@@ -76,7 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             args=["-m", "mcp_server"],
             cwd=BACKEND_DIR,
             # stdio_client filtra el entorno del padre: se pasa explícito lo que el hijo necesita.
-            env={"DATA_FILE": str(settings.data_file), "LOG_LEVEL": settings.log_level},
+            env={"MONGODB_URL": url_mongodb(), "MONGODB_DB": settings.mongodb_db, "LOG_LEVEL": settings.log_level},
         ),
         connect_timeout=settings.mcp_connect_timeout,
         call_timeout=settings.mcp_call_timeout,
