@@ -16,6 +16,13 @@ if not exist ".env" (
     pause
     exit /b 1
 )
+set "MONGODB_URL="
+for /f "tokens=1,* delims==" %%a in ('findstr /b /i "MONGODB_URL=" ".env"') do set "MONGODB_URL=%%b"
+if not defined MONGODB_URL (
+    echo MONGODB_URL esta vacia o falta en .env. Agrega, por ejemplo: MONGODB_URL=mongodb://127.0.0.1:27017/
+    pause
+    exit /b 1
+)
 rem El backend lee los libros de MongoDB: sin la base no arranca.
 sc query MongoDB | findstr /i "RUNNING" >nul
 if errorlevel 1 echo Aviso: el servicio MongoDB no esta RUNNING. Si la base corre a mano, ignora este aviso.
